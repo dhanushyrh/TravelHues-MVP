@@ -1,0 +1,1039 @@
+{
+  "version": "1.0.0",
+  "project": "TravelHues MVP",
+  "description": "Complete entity definitions, field specifications, and DTOs for the TravelHues travel creator platform",
+  "entities": {
+    "User": {
+      "description": "Core user account for both travelers (USER) and travel creators (CREATOR). Single auth table with role-based differentiation.",
+      "tableName": "users",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key, auto-generated UUID" },
+        "email": { "type": "varchar(255)", "required": true, "description": "Unique email address used for login" },
+        "passwordHash": { "type": "varchar(255)", "required": false, "description": "Bcrypt hashed password. Null for OAuth-only accounts" },
+        "firstName": { "type": "varchar(100)", "required": true, "description": "User's first name" },
+        "lastName": { "type": "varchar(100)", "required": true, "description": "User's last name" },
+        "phone": { "type": "varchar(20)", "required": false, "description": "Optional phone number with country code" },
+        "avatarUrl": { "type": "varchar(500)", "required": false, "description": "URL to profile avatar image stored in MinIO/S3" },
+        "role": { "type": "enum(USER,CREATOR,ADMIN)", "required": true, "description": "Platform role. CREATOR can have a storefront and portfolio", "default": "USER" },
+        "isEmailVerified": { "type": "boolean", "required": true, "description": "Whether email has been confirmed via verification link", "default": false },
+        "isActive": { "type": "boolean", "required": true, "description": "Soft delete / account suspension flag", "default": true },
+        "oauthProvider": { "type": "varchar(50)", "required": false, "description": "OAuth provider name: google, apple, facebook" },
+        "oauthProviderId": { "type": "varchar(255)", "required": false, "description": "External OAuth provider user ID" },
+        "lastLoginAt": { "type": "timestamp", "required": false, "description": "Timestamp of last successful login" },
+        "passwordResetToken": { "type": "varchar(255)", "required": false, "description": "Hashed token for password reset flow" },
+        "passwordResetExpiresAt": { "type": "timestamp", "required": false, "description": "Expiry timestamp for password reset token" },
+        "emailVerificationToken": { "type": "varchar(255)", "required": false, "description": "Token sent in verification email" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Record creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Record last update timestamp" }
+      },
+      "relations": {
+        "creatorProfile": { "type": "OneToOne", "entity": "CreatorProfile", "description": "Extended profile data for CREATOR role users" },
+        "orders": { "type": "OneToMany", "entity": "Order", "description": "All purchase orders made by this user" },
+        "reviews": { "type": "OneToMany", "entity": "Review", "description": "Reviews written by this user" },
+        "subscriptions": { "type": "OneToMany", "entity": "Subscription", "description": "All subscriptions this user has (platform + creator subs)" },
+        "following": { "type": "OneToMany", "entity": "Follow", "description": "Creators this user follows" },
+        "notifications": { "type": "OneToMany", "entity": "Notification", "description": "Notifications for this user" },
+        "addresses": { "type": "OneToMany", "entity": "UserAddress", "description": "Saved delivery/billing addresses" },
+        "uploads": { "type": "OneToMany", "entity": "Media", "description": "Media files uploaded by this user" }
+      },
+      "indexes": ["email (unique)", "oauthProvider + oauthProviderId (unique composite)", "role", "isActive"],
+      "dtos": {
+        "CreateDto": {
+          "email": { "type": "string", "required": true, "validation": ["IsEmail", "MaxLength(255)"] },
+          "password": { "type": "string", "required": true, "validation": ["MinLength(8)", "MaxLength(72)", "Matches(/[A-Z]/)", "Matches(/[0-9]/)"] },
+          "firstName": { "type": "string", "required": true, "validation": ["IsString", "MinLength(1)", "MaxLength(100)"] },
+          "lastName": { "type": "string", "required": true, "validation": ["IsString", "MinLength(1)", "MaxLength(100)"] },
+          "phone": { "type": "string", "required": false, "validation": ["IsOptional", "IsMobilePhone"] },
+          "role": { "type": "enum(USER,CREATOR)", "required": false, "validation": ["IsOptional", "IsEnum(UserRole)"], "default": "USER" }
+        },
+        "UpdateDto": {
+          "firstName": { "type": "string", "required": false, "validation": ["IsOptional", "MinLength(1)", "MaxLength(100)"] },
+          "lastName": { "type": "string", "required": false, "validation": ["IsOptional", "MinLength(1)", "MaxLength(100)"] },
+          "phone": { "type": "string", "required": false, "validation": ["IsOptional", "IsMobilePhone"] },
+          "avatarUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl", "MaxLength(500)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "email": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "phone": { "type": "string | null" },
+          "avatarUrl": { "type": "string | null" },
+          "role": { "type": "string" },
+          "isEmailVerified": { "type": "boolean" },
+          "isActive": { "type": "boolean" },
+          "lastLoginAt": { "type": "string | null" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        },
+        "LoginDto": {
+          "email": { "type": "string", "required": true, "validation": ["IsEmail"] },
+          "password": { "type": "string", "required": true, "validation": ["IsString", "IsNotEmpty"] }
+        },
+        "ChangePasswordDto": {
+          "currentPassword": { "type": "string", "required": true, "validation": ["IsString", "IsNotEmpty"] },
+          "newPassword": { "type": "string", "required": true, "validation": ["MinLength(8)", "MaxLength(72)", "Matches(/[A-Z]/)", "Matches(/[0-9]/)"] }
+        },
+        "ForgotPasswordDto": {
+          "email": { "type": "string", "required": true, "validation": ["IsEmail"] }
+        },
+        "ResetPasswordDto": {
+          "token": { "type": "string", "required": true, "validation": ["IsString", "IsNotEmpty"] },
+          "newPassword": { "type": "string", "required": true, "validation": ["MinLength(8)", "MaxLength(72)"] }
+        }
+      }
+    },
+    "CreatorProfile": {
+      "description": "Extended profile for CREATOR role users. Contains public-facing portfolio details, Stripe Connect account info, and aggregated stats.",
+      "tableName": "creator_profiles",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "userId": { "type": "uuid", "required": true, "description": "Foreign key to users.id (OneToOne)" },
+        "displayName": { "type": "varchar(150)", "required": true, "description": "Public creator name shown on storefront" },
+        "bio": { "type": "text", "required": false, "description": "Long-form creator biography (up to 2000 chars)" },
+        "tagline": { "type": "varchar(200)", "required": false, "description": "Short one-liner headline displayed under display name" },
+        "websiteUrl": { "type": "varchar(500)", "required": false, "description": "Personal or business website URL" },
+        "socialLinks": { "type": "jsonb", "required": false, "description": "Social media URLs: { instagram, twitter, youtube, tiktok, facebook }" },
+        "location": { "type": "varchar(150)", "required": false, "description": "Creator's base location e.g. 'Bali, Indonesia'" },
+        "specialties": { "type": "varchar(100)[]", "required": false, "description": "Array of travel specialties e.g. ['adventure', 'luxury', 'budget']" },
+        "isVerified": { "type": "boolean", "required": true, "description": "Platform-verified creator badge", "default": false },
+        "creatorTier": { "type": "enum(BASIC,PRO,PREMIUM)", "required": true, "description": "Creator subscription tier determining platform features", "default": "BASIC" },
+        "stripeAccountId": { "type": "varchar(255)", "required": false, "description": "Stripe Connect Express/Standard account ID for payouts" },
+        "stripeAccountStatus": { "type": "enum(PENDING,ACTIVE,RESTRICTED,DISABLED)", "required": false, "description": "Stripe Connect onboarding status" },
+        "totalFollowers": { "type": "integer", "required": true, "description": "Denormalized follower count for display performance", "default": 0 },
+        "totalSales": { "type": "integer", "required": true, "description": "Total number of products sold across all time", "default": 0 },
+        "totalRevenue": { "type": "decimal(12,2)", "required": true, "description": "Total lifetime revenue earned on platform", "default": 0 },
+        "averageRating": { "type": "decimal(3,2)", "required": true, "description": "Rolling average of all product and creator reviews", "default": 0 },
+        "reviewCount": { "type": "integer", "required": true, "description": "Total number of reviews received", "default": 0 },
+        "featuredUntil": { "type": "timestamp", "required": false, "description": "If set, creator is shown in featured section until this date" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Profile creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last update timestamp" }
+      },
+      "relations": {
+        "user": { "type": "OneToOne", "entity": "User", "description": "The user account this profile belongs to" },
+        "portfolios": { "type": "OneToMany", "entity": "Portfolio", "description": "All portfolio collections created by this creator" },
+        "storefront": { "type": "OneToOne", "entity": "Storefront", "description": "The creator's product storefront" },
+        "followers": { "type": "OneToMany", "entity": "Follow", "description": "Users who follow this creator" },
+        "analytics": { "type": "OneToMany", "entity": "CreatorAnalytics", "description": "Daily analytics snapshots" }
+      },
+      "indexes": ["userId (unique)", "creatorTier", "isVerified", "totalFollowers", "averageRating"],
+      "dtos": {
+        "CreateDto": {
+          "displayName": { "type": "string", "required": true, "validation": ["IsString", "MinLength(2)", "MaxLength(150)"] },
+          "bio": { "type": "string", "required": false, "validation": ["IsOptional", "IsString", "MaxLength(2000)"] },
+          "tagline": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(200)"] },
+          "websiteUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl"] },
+          "socialLinks": { "type": "object", "required": false, "validation": ["IsOptional", "IsObject", "ValidateNested"] },
+          "location": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(150)"] },
+          "specialties": { "type": "string[]", "required": false, "validation": ["IsOptional", "IsArray", "ArrayMaxSize(20)"] }
+        },
+        "UpdateDto": {
+          "displayName": { "type": "string", "required": false, "validation": ["IsOptional", "MinLength(2)", "MaxLength(150)"] },
+          "bio": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(2000)"] },
+          "tagline": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(200)"] },
+          "websiteUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl"] },
+          "socialLinks": { "type": "object", "required": false, "validation": ["IsOptional", "IsObject"] },
+          "location": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(150)"] },
+          "specialties": { "type": "string[]", "required": false, "validation": ["IsOptional", "IsArray", "ArrayMaxSize(20)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "displayName": { "type": "string" },
+          "bio": { "type": "string | null" },
+          "tagline": { "type": "string | null" },
+          "websiteUrl": { "type": "string | null" },
+          "socialLinks": { "type": "object | null" },
+          "location": { "type": "string | null" },
+          "specialties": { "type": "string[]" },
+          "isVerified": { "type": "boolean" },
+          "creatorTier": { "type": "string" },
+          "totalFollowers": { "type": "number" },
+          "totalSales": { "type": "number" },
+          "averageRating": { "type": "number" },
+          "reviewCount": { "type": "number" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        },
+        "PublicResponseDto": {
+          "id": { "type": "string" },
+          "displayName": { "type": "string" },
+          "bio": { "type": "string | null" },
+          "tagline": { "type": "string | null" },
+          "websiteUrl": { "type": "string | null" },
+          "socialLinks": { "type": "object | null" },
+          "location": { "type": "string | null" },
+          "specialties": { "type": "string[]" },
+          "isVerified": { "type": "boolean" },
+          "totalFollowers": { "type": "number" },
+          "averageRating": { "type": "number" },
+          "reviewCount": { "type": "number" }
+        }
+      }
+    },
+    "Portfolio": {
+      "description": "A named collection of portfolio items (travel photos/stories) created by a creator. One creator can have multiple portfolios.",
+      "tableName": "portfolios",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "creatorId": { "type": "uuid", "required": true, "description": "Foreign key to creator_profiles.id" },
+        "title": { "type": "varchar(200)", "required": true, "description": "Portfolio collection title e.g. 'Southeast Asia 2024'" },
+        "description": { "type": "text", "required": false, "description": "Long description of what this portfolio covers" },
+        "coverImageUrl": { "type": "varchar(500)", "required": false, "description": "Hero image URL for this portfolio" },
+        "isPublished": { "type": "boolean", "required": true, "description": "Whether this portfolio is visible to the public", "default": false },
+        "viewCount": { "type": "integer", "required": true, "description": "Total number of times this portfolio has been viewed", "default": 0 },
+        "featuredOrder": { "type": "integer", "required": false, "description": "Sort order when displayed as featured on creator profile. Null = not featured" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last update timestamp" }
+      },
+      "relations": {
+        "creator": { "type": "ManyToOne", "entity": "CreatorProfile", "description": "The creator who owns this portfolio" },
+        "items": { "type": "OneToMany", "entity": "PortfolioItem", "description": "All media items within this portfolio" }
+      },
+      "indexes": ["creatorId", "isPublished", "featuredOrder"],
+      "dtos": {
+        "CreateDto": {
+          "title": { "type": "string", "required": true, "validation": ["IsString", "MinLength(2)", "MaxLength(200)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "IsString", "MaxLength(5000)"] },
+          "coverImageUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl", "MaxLength(500)"] },
+          "isPublished": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"], "default": false },
+          "featuredOrder": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)"] }
+        },
+        "UpdateDto": {
+          "title": { "type": "string", "required": false, "validation": ["IsOptional", "MinLength(2)", "MaxLength(200)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(5000)"] },
+          "coverImageUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl"] },
+          "isPublished": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"] },
+          "featuredOrder": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "creatorId": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string | null" },
+          "coverImageUrl": { "type": "string | null" },
+          "isPublished": { "type": "boolean" },
+          "viewCount": { "type": "number" },
+          "featuredOrder": { "type": "number | null" },
+          "itemCount": { "type": "number" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "PortfolioItem": {
+      "description": "An individual media entry (photo, gallery, story) within a portfolio collection.",
+      "tableName": "portfolio_items",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "portfolioId": { "type": "uuid", "required": true, "description": "Foreign key to portfolios.id" },
+        "title": { "type": "varchar(200)", "required": true, "description": "Title for this item/shot" },
+        "description": { "type": "text", "required": false, "description": "Caption, story or description of the image/video" },
+        "mediaUrls": { "type": "varchar(500)[]", "required": true, "description": "Array of media file URLs (supports multi-photo carousels)" },
+        "mediaTypes": { "type": "enum(IMAGE,VIDEO)[]", "required": false, "description": "Type corresponding to each mediaUrl entry" },
+        "location": { "type": "varchar(200)", "required": false, "description": "Geographic location where media was captured" },
+        "latitude": { "type": "decimal(10,7)", "required": false, "description": "GPS latitude for map display" },
+        "longitude": { "type": "decimal(10,7)", "required": false, "description": "GPS longitude for map display" },
+        "travelDate": { "type": "date", "required": false, "description": "Date the photo/experience occurred" },
+        "tags": { "type": "varchar(100)[]", "required": false, "description": "Searchable tags for this item" },
+        "displayOrder": { "type": "integer", "required": true, "description": "Sort position within the portfolio", "default": 0 },
+        "viewCount": { "type": "integer", "required": true, "description": "View count for this specific item", "default": 0 },
+        "likeCount": { "type": "integer", "required": true, "description": "Number of likes on this item", "default": 0 },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last update timestamp" }
+      },
+      "relations": {
+        "portfolio": { "type": "ManyToOne", "entity": "Portfolio", "description": "Parent portfolio this item belongs to" }
+      },
+      "indexes": ["portfolioId", "displayOrder", "travelDate"],
+      "dtos": {
+        "CreateDto": {
+          "title": { "type": "string", "required": true, "validation": ["IsString", "MinLength(1)", "MaxLength(200)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(5000)"] },
+          "mediaUrls": { "type": "string[]", "required": true, "validation": ["IsArray", "ArrayMinSize(1)", "ArrayMaxSize(20)", "IsUrl({each:true})"] },
+          "location": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(200)"] },
+          "latitude": { "type": "number", "required": false, "validation": ["IsOptional", "IsLatitude"] },
+          "longitude": { "type": "number", "required": false, "validation": ["IsOptional", "IsLongitude"] },
+          "travelDate": { "type": "string", "required": false, "validation": ["IsOptional", "IsDateString"] },
+          "tags": { "type": "string[]", "required": false, "validation": ["IsOptional", "IsArray", "ArrayMaxSize(30)"] },
+          "displayOrder": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)"], "default": 0 }
+        },
+        "UpdateDto": {
+          "title": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(200)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(5000)"] },
+          "mediaUrls": { "type": "string[]", "required": false, "validation": ["IsOptional", "IsArray", "ArrayMinSize(1)"] },
+          "location": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(200)"] },
+          "travelDate": { "type": "string", "required": false, "validation": ["IsOptional", "IsDateString"] },
+          "tags": { "type": "string[]", "required": false, "validation": ["IsOptional", "IsArray"] },
+          "displayOrder": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "portfolioId": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string | null" },
+          "mediaUrls": { "type": "string[]" },
+          "location": { "type": "string | null" },
+          "latitude": { "type": "number | null" },
+          "longitude": { "type": "number | null" },
+          "travelDate": { "type": "string | null" },
+          "tags": { "type": "string[]" },
+          "displayOrder": { "type": "number" },
+          "viewCount": { "type": "number" },
+          "likeCount": { "type": "number" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "Storefront": {
+      "description": "The creator's public shop page. One-to-one with CreatorProfile. Contains branding, slug for URL, and aggregated revenue stats.",
+      "tableName": "storefronts",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "creatorId": { "type": "uuid", "required": true, "description": "Foreign key to creator_profiles.id (unique)" },
+        "name": { "type": "varchar(150)", "required": true, "description": "Storefront display name" },
+        "slug": { "type": "varchar(100)", "required": true, "description": "URL-safe unique identifier e.g. 'nomad-adventures'. Used in /shop/{slug}" },
+        "description": { "type": "text", "required": false, "description": "Storefront about/description text" },
+        "logoUrl": { "type": "varchar(500)", "required": false, "description": "Storefront logo image URL" },
+        "bannerUrl": { "type": "varchar(500)", "required": false, "description": "Wide banner/hero image for storefront header" },
+        "themeColor": { "type": "varchar(7)", "required": false, "description": "Hex color code for storefront accent color e.g. '#E87C2A'", "default": "#000000" },
+        "customDomain": { "type": "varchar(255)", "required": false, "description": "Optional custom domain for Pro/Premium creators e.g. 'shop.creator.com'" },
+        "isPublished": { "type": "boolean", "required": true, "description": "Whether storefront is publicly visible", "default": false },
+        "totalRevenue": { "type": "decimal(12,2)", "required": true, "description": "Denormalized total revenue for quick display", "default": 0 },
+        "totalOrders": { "type": "integer", "required": true, "description": "Total fulfilled orders count", "default": 0 },
+        "metaTitle": { "type": "varchar(70)", "required": false, "description": "SEO meta title override" },
+        "metaDescription": { "type": "varchar(160)", "required": false, "description": "SEO meta description override" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last update timestamp" }
+      },
+      "relations": {
+        "creator": { "type": "OneToOne", "entity": "CreatorProfile", "description": "The creator who owns this storefront" },
+        "products": { "type": "OneToMany", "entity": "Product", "description": "All products listed in this storefront" }
+      },
+      "indexes": ["creatorId (unique)", "slug (unique)", "customDomain (unique)", "isPublished"],
+      "dtos": {
+        "CreateDto": {
+          "name": { "type": "string", "required": true, "validation": ["IsString", "MinLength(2)", "MaxLength(150)"] },
+          "slug": { "type": "string", "required": true, "validation": ["IsString", "Matches(/^[a-z0-9-]+$/)", "MinLength(3)", "MaxLength(100)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(5000)"] },
+          "themeColor": { "type": "string", "required": false, "validation": ["IsOptional", "Matches(/^#[0-9A-Fa-f]{6}$/)"] }
+        },
+        "UpdateDto": {
+          "name": { "type": "string", "required": false, "validation": ["IsOptional", "MinLength(2)", "MaxLength(150)"] },
+          "slug": { "type": "string", "required": false, "validation": ["IsOptional", "Matches(/^[a-z0-9-]+$/)", "MinLength(3)", "MaxLength(100)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(5000)"] },
+          "logoUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl"] },
+          "bannerUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl"] },
+          "themeColor": { "type": "string", "required": false, "validation": ["IsOptional", "Matches(/^#[0-9A-Fa-f]{6}$/)"] },
+          "customDomain": { "type": "string", "required": false, "validation": ["IsOptional", "IsFqdn"] },
+          "isPublished": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"] },
+          "metaTitle": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(70)"] },
+          "metaDescription": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(160)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "creatorId": { "type": "string" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "description": { "type": "string | null" },
+          "logoUrl": { "type": "string | null" },
+          "bannerUrl": { "type": "string | null" },
+          "themeColor": { "type": "string" },
+          "customDomain": { "type": "string | null" },
+          "isPublished": { "type": "boolean" },
+          "totalRevenue": { "type": "number" },
+          "totalOrders": { "type": "number" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "Product": {
+      "description": "A sellable item in a creator's storefront. Can be digital (itinerary PDF, preset pack, guide) or a service (consultation, experience).",
+      "tableName": "products",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "storefrontId": { "type": "uuid", "required": true, "description": "Foreign key to storefronts.id" },
+        "creatorId": { "type": "uuid", "required": true, "description": "Foreign key to creator_profiles.id (denormalized for query performance)" },
+        "title": { "type": "varchar(200)", "required": true, "description": "Product title shown in listings" },
+        "description": { "type": "text", "required": false, "description": "Full product description with feature list, what's included" },
+        "type": { "type": "enum(ITINERARY,PHOTO_PRESET,TRAVEL_GUIDE,EXPERIENCE,DIGITAL_DOWNLOAD,CONSULTATION)", "required": true, "description": "Product category determining display and behavior" },
+        "price": { "type": "decimal(10,2)", "required": true, "description": "Price in smallest unit representation (display as dollars)" },
+        "currency": { "type": "varchar(3)", "required": true, "description": "ISO 4217 currency code e.g. USD", "default": "USD" },
+        "coverImageUrl": { "type": "varchar(500)", "required": false, "description": "Main product listing thumbnail image" },
+        "previewImages": { "type": "varchar(500)[]", "required": false, "description": "Additional product image gallery URLs" },
+        "isPublished": { "type": "boolean", "required": true, "description": "Whether product appears in storefront listings", "default": false },
+        "isDigital": { "type": "boolean", "required": true, "description": "True for digital downloads; false for services/physical", "default": true },
+        "fileUrl": { "type": "varchar(500)", "required": false, "description": "Private MinIO/S3 URL for digital product file. Only exposed post-purchase" },
+        "fileSize": { "type": "integer", "required": false, "description": "File size in bytes for digital products" },
+        "fileMimeType": { "type": "varchar(100)", "required": false, "description": "MIME type of digital file e.g. application/pdf" },
+        "stock": { "type": "integer", "required": false, "description": "Available stock. Null = unlimited (default for digital products)" },
+        "stripePriceId": { "type": "varchar(100)", "required": false, "description": "Stripe Price ID for checkout sessions" },
+        "stripeProductId": { "type": "varchar(100)", "required": false, "description": "Stripe Product ID" },
+        "totalSold": { "type": "integer", "required": true, "description": "Total units sold across all time", "default": 0 },
+        "averageRating": { "type": "decimal(3,2)", "required": true, "description": "Rolling average rating from verified reviews", "default": 0 },
+        "reviewCount": { "type": "integer", "required": true, "description": "Total number of reviews for this product", "default": 0 },
+        "tags": { "type": "varchar(100)[]", "required": false, "description": "Searchable product tags" },
+        "metadata": { "type": "jsonb", "required": false, "description": "Type-specific metadata e.g. { days: 7, destinations: [...] } for itineraries" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last update timestamp" }
+      },
+      "relations": {
+        "storefront": { "type": "ManyToOne", "entity": "Storefront", "description": "The storefront this product belongs to" },
+        "creator": { "type": "ManyToOne", "entity": "CreatorProfile", "description": "Denormalized creator reference" },
+        "orderItems": { "type": "OneToMany", "entity": "OrderItem", "description": "All order line items for this product" },
+        "reviews": { "type": "OneToMany", "entity": "Review", "description": "Reviews written for this product" }
+      },
+      "indexes": ["storefrontId", "creatorId", "type", "isPublished", "price", "averageRating", "totalSold"],
+      "dtos": {
+        "CreateDto": {
+          "title": { "type": "string", "required": true, "validation": ["IsString", "MinLength(3)", "MaxLength(200)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(10000)"] },
+          "type": { "type": "enum", "required": true, "validation": ["IsEnum(ProductType)"] },
+          "price": { "type": "number", "required": true, "validation": ["IsNumber", "Min(0)", "Max(99999)"] },
+          "currency": { "type": "string", "required": false, "validation": ["IsOptional", "Length(3,3)", "IsISO4217CurrencyCode"], "default": "USD" },
+          "isDigital": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"], "default": true },
+          "stock": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)"] },
+          "tags": { "type": "string[]", "required": false, "validation": ["IsOptional", "IsArray", "ArrayMaxSize(20)"] },
+          "metadata": { "type": "object", "required": false, "validation": ["IsOptional", "IsObject"] }
+        },
+        "UpdateDto": {
+          "title": { "type": "string", "required": false, "validation": ["IsOptional", "MinLength(3)", "MaxLength(200)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(10000)"] },
+          "price": { "type": "number", "required": false, "validation": ["IsOptional", "IsNumber", "Min(0)"] },
+          "coverImageUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl"] },
+          "isPublished": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"] },
+          "stock": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)"] },
+          "tags": { "type": "string[]", "required": false, "validation": ["IsOptional", "IsArray"] },
+          "metadata": { "type": "object", "required": false, "validation": ["IsOptional", "IsObject"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "storefrontId": { "type": "string" },
+          "creatorId": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string | null" },
+          "type": { "type": "string" },
+          "price": { "type": "number" },
+          "currency": { "type": "string" },
+          "coverImageUrl": { "type": "string | null" },
+          "previewImages": { "type": "string[]" },
+          "isPublished": { "type": "boolean" },
+          "isDigital": { "type": "boolean" },
+          "stock": { "type": "number | null" },
+          "totalSold": { "type": "number" },
+          "averageRating": { "type": "number" },
+          "reviewCount": { "type": "number" },
+          "tags": { "type": "string[]" },
+          "metadata": { "type": "object | null" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "Order": {
+      "description": "A purchase transaction by a user. May contain multiple products from a single creator (per-creator checkout model).",
+      "tableName": "orders",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "userId": { "type": "uuid", "required": true, "description": "Foreign key to users.id (buyer)" },
+        "creatorId": { "type": "uuid", "required": true, "description": "Foreign key to creator_profiles.id (seller). One order per creator per checkout." },
+        "status": { "type": "enum(PENDING,CONFIRMED,COMPLETED,CANCELLED,REFUNDED)", "required": true, "description": "Order lifecycle state", "default": "PENDING" },
+        "subtotal": { "type": "decimal(10,2)", "required": true, "description": "Sum of all line item totals before tax" },
+        "tax": { "type": "decimal(10,2)", "required": true, "description": "Tax amount applied to order", "default": 0 },
+        "platformFee": { "type": "decimal(10,2)", "required": true, "description": "Platform commission taken from order total", "default": 0 },
+        "total": { "type": "decimal(10,2)", "required": true, "description": "Final charged amount (subtotal + tax)" },
+        "currency": { "type": "varchar(3)", "required": true, "description": "ISO 4217 currency code", "default": "USD" },
+        "stripePaymentIntentId": { "type": "varchar(100)", "required": false, "description": "Stripe PaymentIntent ID for payment tracking" },
+        "stripeChargeId": { "type": "varchar(100)", "required": false, "description": "Stripe Charge ID after payment confirmation" },
+        "notes": { "type": "text", "required": false, "description": "Optional buyer notes attached to the order" },
+        "refundedAt": { "type": "timestamp", "required": false, "description": "Timestamp when refund was processed" },
+        "refundReason": { "type": "text", "required": false, "description": "Reason recorded for refund" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Order placed timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last status update timestamp" }
+      },
+      "relations": {
+        "user": { "type": "ManyToOne", "entity": "User", "description": "The buyer" },
+        "creator": { "type": "ManyToOne", "entity": "CreatorProfile", "description": "The seller" },
+        "items": { "type": "OneToMany", "entity": "OrderItem", "description": "Line items in this order" }
+      },
+      "indexes": ["userId", "creatorId", "status", "stripePaymentIntentId", "createdAt"],
+      "dtos": {
+        "CreateDto": {
+          "items": { "type": "CreateOrderItemDto[]", "required": true, "validation": ["IsArray", "ArrayMinSize(1)", "ValidateNested({each:true})"] },
+          "notes": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(1000)"] },
+          "currency": { "type": "string", "required": false, "validation": ["IsOptional", "Length(3,3)"], "default": "USD" }
+        },
+        "UpdateStatusDto": {
+          "status": { "type": "enum", "required": true, "validation": ["IsEnum(OrderStatus)"] },
+          "refundReason": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(500)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "creatorId": { "type": "string" },
+          "status": { "type": "string" },
+          "subtotal": { "type": "number" },
+          "tax": { "type": "number" },
+          "total": { "type": "number" },
+          "currency": { "type": "string" },
+          "notes": { "type": "string | null" },
+          "items": { "type": "OrderItemResponseDto[]" },
+          "refundedAt": { "type": "string | null" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "OrderItem": {
+      "description": "A single line item within an order. Captures price at time of purchase (immutable snapshot).",
+      "tableName": "order_items",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "orderId": { "type": "uuid", "required": true, "description": "Foreign key to orders.id" },
+        "productId": { "type": "uuid", "required": true, "description": "Foreign key to products.id" },
+        "creatorId": { "type": "uuid", "required": true, "description": "Denormalized creator ID for analytics queries" },
+        "productTitle": { "type": "varchar(200)", "required": true, "description": "Snapshot of product title at purchase time" },
+        "productType": { "type": "varchar(50)", "required": true, "description": "Snapshot of product type at purchase time" },
+        "quantity": { "type": "integer", "required": true, "description": "Number of units purchased", "default": 1 },
+        "unitPrice": { "type": "decimal(10,2)", "required": true, "description": "Price per unit at time of purchase (immutable)" },
+        "total": { "type": "decimal(10,2)", "required": true, "description": "quantity * unitPrice" },
+        "downloadUrl": { "type": "varchar(500)", "required": false, "description": "Signed download URL for digital products. Generated on order completion" },
+        "downloadCount": { "type": "integer", "required": true, "description": "Number of times file has been downloaded", "default": 0 },
+        "downloadLimit": { "type": "integer", "required": false, "description": "Maximum allowed downloads. Null = unlimited" },
+        "downloadExpiresAt": { "type": "timestamp", "required": false, "description": "When the download link expires" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Line item creation timestamp" }
+      },
+      "relations": {
+        "order": { "type": "ManyToOne", "entity": "Order", "description": "Parent order" },
+        "product": { "type": "ManyToOne", "entity": "Product", "description": "The product purchased" }
+      },
+      "indexes": ["orderId", "productId", "creatorId"],
+      "dtos": {
+        "CreateDto": {
+          "productId": { "type": "string", "required": true, "validation": ["IsUUID"] },
+          "quantity": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(1)", "Max(100)"], "default": 1 }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "orderId": { "type": "string" },
+          "productId": { "type": "string" },
+          "productTitle": { "type": "string" },
+          "productType": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unitPrice": { "type": "number" },
+          "total": { "type": "number" },
+          "downloadUrl": { "type": "string | null" },
+          "downloadCount": { "type": "number" },
+          "downloadExpiresAt": { "type": "string | null" },
+          "createdAt": { "type": "string" }
+        }
+      }
+    },
+    "Review": {
+      "description": "A rating and text review left by a user for either a product or a creator directly. Linked to orders for purchase verification.",
+      "tableName": "reviews",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "userId": { "type": "uuid", "required": true, "description": "Foreign key to users.id (reviewer)" },
+        "targetType": { "type": "enum(PRODUCT,CREATOR)", "required": true, "description": "What is being reviewed" },
+        "targetId": { "type": "uuid", "required": true, "description": "ID of the product or creator being reviewed" },
+        "orderId": { "type": "uuid", "required": false, "description": "Foreign key to orders.id. Set for product reviews to verify purchase" },
+        "rating": { "type": "smallint", "required": true, "description": "Rating from 1 to 5 stars" },
+        "title": { "type": "varchar(150)", "required": false, "description": "Short review headline" },
+        "content": { "type": "text", "required": false, "description": "Full review body text" },
+        "isVerified": { "type": "boolean", "required": true, "description": "True if reviewer has a confirmed purchase of the product", "default": false },
+        "isHidden": { "type": "boolean", "required": true, "description": "Admin moderation flag to hide inappropriate reviews", "default": false },
+        "helpfulCount": { "type": "integer", "required": true, "description": "Number of other users who marked this review as helpful", "default": 0 },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Review submission timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last edit timestamp" }
+      },
+      "relations": {
+        "user": { "type": "ManyToOne", "entity": "User", "description": "The reviewer" },
+        "order": { "type": "ManyToOne", "entity": "Order", "description": "Associated purchase order (nullable)" }
+      },
+      "indexes": ["userId", "targetType + targetId (composite)", "orderId", "isHidden"],
+      "dtos": {
+        "CreateDto": {
+          "targetType": { "type": "enum", "required": true, "validation": ["IsEnum(ReviewTargetType)"] },
+          "targetId": { "type": "string", "required": true, "validation": ["IsUUID"] },
+          "orderId": { "type": "string", "required": false, "validation": ["IsOptional", "IsUUID"] },
+          "rating": { "type": "number", "required": true, "validation": ["IsInt", "Min(1)", "Max(5)"] },
+          "title": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(150)"] },
+          "content": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(3000)"] }
+        },
+        "UpdateDto": {
+          "rating": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(1)", "Max(5)"] },
+          "title": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(150)"] },
+          "content": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(3000)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "user": { "type": "UserSummaryDto" },
+          "targetType": { "type": "string" },
+          "targetId": { "type": "string" },
+          "rating": { "type": "number" },
+          "title": { "type": "string | null" },
+          "content": { "type": "string | null" },
+          "isVerified": { "type": "boolean" },
+          "helpfulCount": { "type": "number" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "SubscriptionPlan": {
+      "description": "Defines the available subscription tiers for both creators (platform access tiers) and users (premium access + user->creator subs). Managed by admin.",
+      "tableName": "subscription_plans",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "name": { "type": "varchar(100)", "required": true, "description": "Plan display name e.g. 'Creator Pro Monthly'" },
+        "description": { "type": "text", "required": false, "description": "Plan description shown on pricing page" },
+        "type": { "type": "enum(CREATOR_TIER,USER_PREMIUM,USER_CREATOR)", "required": true, "description": "CREATOR_TIER: creator platform plans, USER_PREMIUM: platform access for users, USER_CREATOR: user subscribing to a specific creator" },
+        "tier": { "type": "enum(BASIC,PRO,PREMIUM)", "required": false, "description": "Applicable tier level for CREATOR_TIER and USER_PREMIUM plans" },
+        "price": { "type": "decimal(10,2)", "required": true, "description": "Subscription price per billing period" },
+        "currency": { "type": "varchar(3)", "required": true, "description": "ISO 4217 currency code", "default": "USD" },
+        "billingPeriod": { "type": "enum(MONTHLY,YEARLY)", "required": true, "description": "Billing cycle frequency" },
+        "trialDays": { "type": "integer", "required": false, "description": "Number of free trial days. Null = no trial", "default": 0 },
+        "features": { "type": "jsonb", "required": true, "description": "Array of feature strings displayed on pricing page e.g. ['Unlimited portfolios', '5% commission rate']" },
+        "stripeProductId": { "type": "varchar(100)", "required": false, "description": "Stripe Product ID corresponding to this plan" },
+        "stripePriceId": { "type": "varchar(100)", "required": false, "description": "Stripe Price ID used when creating subscriptions" },
+        "isActive": { "type": "boolean", "required": true, "description": "Whether new subscriptions can be created on this plan", "default": true },
+        "sortOrder": { "type": "integer", "required": true, "description": "Display order on pricing page", "default": 0 },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last update timestamp" }
+      },
+      "relations": {
+        "subscriptions": { "type": "OneToMany", "entity": "Subscription", "description": "All active/historical subscriptions on this plan" }
+      },
+      "indexes": ["type", "tier", "isActive", "stripePriceId (unique)"],
+      "dtos": {
+        "CreateDto": {
+          "name": { "type": "string", "required": true, "validation": ["IsString", "MaxLength(100)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(2000)"] },
+          "type": { "type": "enum", "required": true, "validation": ["IsEnum(SubscriptionPlanType)"] },
+          "tier": { "type": "enum", "required": false, "validation": ["IsOptional", "IsEnum(SubscriptionTier)"] },
+          "price": { "type": "number", "required": true, "validation": ["IsNumber", "Min(0)"] },
+          "currency": { "type": "string", "required": false, "validation": ["IsOptional", "Length(3,3)"], "default": "USD" },
+          "billingPeriod": { "type": "enum", "required": true, "validation": ["IsEnum(BillingPeriod)"] },
+          "trialDays": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)", "Max(90)"] },
+          "features": { "type": "string[]", "required": true, "validation": ["IsArray", "IsString({each:true})", "ArrayMaxSize(30)"] },
+          "sortOrder": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)"] }
+        },
+        "UpdateDto": {
+          "name": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(100)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(2000)"] },
+          "features": { "type": "string[]", "required": false, "validation": ["IsOptional", "IsArray"] },
+          "isActive": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"] },
+          "sortOrder": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string | null" },
+          "type": { "type": "string" },
+          "tier": { "type": "string | null" },
+          "price": { "type": "number" },
+          "currency": { "type": "string" },
+          "billingPeriod": { "type": "string" },
+          "trialDays": { "type": "number" },
+          "features": { "type": "string[]" },
+          "isActive": { "type": "boolean" },
+          "sortOrder": { "type": "number" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "Subscription": {
+      "description": "An active or historical subscription record linking a subscriber to a plan. Covers creator platform tiers, user premium, and user->creator subscriptions.",
+      "tableName": "subscriptions",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "subscriberId": { "type": "uuid", "required": true, "description": "Foreign key to users.id (the subscriber)" },
+        "creatorId": { "type": "uuid", "required": false, "description": "Foreign key to creator_profiles.id. Only set for USER_CREATOR type subscriptions" },
+        "planId": { "type": "uuid", "required": true, "description": "Foreign key to subscription_plans.id" },
+        "status": { "type": "enum(ACTIVE,INACTIVE,CANCELLED,PAST_DUE,TRIALING,EXPIRED)", "required": true, "description": "Current subscription lifecycle state", "default": "TRIALING" },
+        "currentPeriodStart": { "type": "timestamp", "required": true, "description": "Start of current billing period (synced from Stripe)" },
+        "currentPeriodEnd": { "type": "timestamp", "required": true, "description": "End of current billing period (synced from Stripe)" },
+        "trialEnd": { "type": "timestamp", "required": false, "description": "When the trial period ends. Null if no trial" },
+        "cancelAtPeriodEnd": { "type": "boolean", "required": true, "description": "If true, subscription cancels at period end without renewal", "default": false },
+        "cancelledAt": { "type": "timestamp", "required": false, "description": "When cancellation was requested" },
+        "stripeSubscriptionId": { "type": "varchar(100)", "required": false, "description": "Stripe Subscription ID for webhook correlation" },
+        "stripeCustomerId": { "type": "varchar(100)", "required": false, "description": "Stripe Customer ID for this subscriber" },
+        "metadata": { "type": "jsonb", "required": false, "description": "Additional subscription metadata" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Subscription creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last status update timestamp" }
+      },
+      "relations": {
+        "subscriber": { "type": "ManyToOne", "entity": "User", "description": "The subscribing user" },
+        "creator": { "type": "ManyToOne", "entity": "CreatorProfile", "description": "The creator being subscribed to (nullable)" },
+        "plan": { "type": "ManyToOne", "entity": "SubscriptionPlan", "description": "The subscription plan" }
+      },
+      "indexes": ["subscriberId", "creatorId", "planId", "status", "stripeSubscriptionId (unique)", "currentPeriodEnd"],
+      "dtos": {
+        "CreateDto": {
+          "planId": { "type": "string", "required": true, "validation": ["IsUUID"] },
+          "creatorId": { "type": "string", "required": false, "validation": ["IsOptional", "IsUUID"] },
+          "paymentMethodId": { "type": "string", "required": true, "validation": ["IsString", "IsNotEmpty"] }
+        },
+        "CancelDto": {
+          "cancelAtPeriodEnd": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"], "default": true },
+          "reason": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(500)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "subscriberId": { "type": "string" },
+          "creatorId": { "type": "string | null" },
+          "planId": { "type": "string" },
+          "plan": { "type": "SubscriptionPlanResponseDto" },
+          "status": { "type": "string" },
+          "currentPeriodStart": { "type": "string" },
+          "currentPeriodEnd": { "type": "string" },
+          "trialEnd": { "type": "string | null" },
+          "cancelAtPeriodEnd": { "type": "boolean" },
+          "cancelledAt": { "type": "string | null" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "Follow": {
+      "description": "A follow relationship between a user and a creator. Used for discovery feed and creator notification of new followers.",
+      "tableName": "follows",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "followerId": { "type": "uuid", "required": true, "description": "Foreign key to users.id (the follower)" },
+        "creatorId": { "type": "uuid", "required": true, "description": "Foreign key to creator_profiles.id (being followed)" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "When the follow action occurred" }
+      },
+      "relations": {
+        "follower": { "type": "ManyToOne", "entity": "User", "description": "The user following" },
+        "creator": { "type": "ManyToOne", "entity": "CreatorProfile", "description": "The creator being followed" }
+      },
+      "indexes": ["followerId + creatorId (unique composite)", "creatorId", "createdAt"],
+      "dtos": {
+        "CreateDto": {
+          "creatorId": { "type": "string", "required": true, "validation": ["IsUUID"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "followerId": { "type": "string" },
+          "creatorId": { "type": "string" },
+          "creator": { "type": "CreatorProfilePublicResponseDto" },
+          "createdAt": { "type": "string" }
+        }
+      }
+    },
+    "Media": {
+      "description": "Tracks all files uploaded to MinIO/S3 storage. Used for managing storage quotas, generating signed URLs, and cleanup.",
+      "tableName": "media",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "uploadedById": { "type": "uuid", "required": true, "description": "Foreign key to users.id (uploader)" },
+        "type": { "type": "enum(IMAGE,VIDEO,DOCUMENT,AUDIO)", "required": true, "description": "Media category for display/processing purposes" },
+        "url": { "type": "varchar(500)", "required": true, "description": "Full public or pre-signed URL to the media" },
+        "thumbnailUrl": { "type": "varchar(500)", "required": false, "description": "URL to generated thumbnail (for images/videos)" },
+        "filename": { "type": "varchar(255)", "required": true, "description": "Original uploaded filename" },
+        "storageKey": { "type": "varchar(500)", "required": true, "description": "MinIO/S3 object key path (bucket-relative)" },
+        "bucket": { "type": "varchar(100)", "required": true, "description": "Storage bucket name" },
+        "size": { "type": "bigint", "required": true, "description": "File size in bytes" },
+        "mimeType": { "type": "varchar(100)", "required": true, "description": "MIME type e.g. image/jpeg, video/mp4, application/pdf" },
+        "width": { "type": "integer", "required": false, "description": "Image/video width in pixels" },
+        "height": { "type": "integer", "required": false, "description": "Image/video height in pixels" },
+        "duration": { "type": "integer", "required": false, "description": "Video/audio duration in seconds" },
+        "isPublic": { "type": "boolean", "required": true, "description": "Whether file is publicly accessible without auth", "default": false },
+        "metadata": { "type": "jsonb", "required": false, "description": "Additional file metadata e.g. EXIF data, processing status" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Upload timestamp" }
+      },
+      "relations": {
+        "uploadedBy": { "type": "ManyToOne", "entity": "User", "description": "The user who uploaded this file" }
+      },
+      "indexes": ["uploadedById", "type", "mimeType", "storageKey (unique)", "createdAt"],
+      "dtos": {
+        "UploadResponseDto": {
+          "id": { "type": "string" },
+          "url": { "type": "string" },
+          "thumbnailUrl": { "type": "string | null" },
+          "filename": { "type": "string" },
+          "size": { "type": "number" },
+          "mimeType": { "type": "string" },
+          "width": { "type": "number | null" },
+          "height": { "type": "number | null" },
+          "type": { "type": "string" },
+          "createdAt": { "type": "string" }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "uploadedById": { "type": "string" },
+          "type": { "type": "string" },
+          "url": { "type": "string" },
+          "thumbnailUrl": { "type": "string | null" },
+          "filename": { "type": "string" },
+          "size": { "type": "number" },
+          "mimeType": { "type": "string" },
+          "width": { "type": "number | null" },
+          "height": { "type": "number | null" },
+          "isPublic": { "type": "boolean" },
+          "createdAt": { "type": "string" }
+        }
+      }
+    },
+    "Notification": {
+      "description": "In-app and push notification records for users. Covers follows, purchases, subscription events, and system messages.",
+      "tableName": "notifications",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "userId": { "type": "uuid", "required": true, "description": "Foreign key to users.id (recipient)" },
+        "type": { "type": "enum(FOLLOW,NEW_PRODUCT,ORDER_STATUS,SUBSCRIPTION,REVIEW,SYSTEM,NEW_SUBSCRIBER,PAYMENT_FAILED,PAYOUT_SENT)", "required": true, "description": "Notification category for icon and routing" },
+        "title": { "type": "varchar(200)", "required": true, "description": "Short notification headline" },
+        "body": { "type": "varchar(500)", "required": true, "description": "Notification body/message text" },
+        "data": { "type": "jsonb", "required": false, "description": "Arbitrary payload for deep linking e.g. { orderId, productId, creatorId }" },
+        "isRead": { "type": "boolean", "required": true, "description": "Whether user has read/dismissed this notification", "default": false },
+        "readAt": { "type": "timestamp", "required": false, "description": "When notification was marked as read" },
+        "actionUrl": { "type": "varchar(500)", "required": false, "description": "Deep link URL for tapping the notification" },
+        "sentViaPush": { "type": "boolean", "required": true, "description": "Whether push notification was dispatched to mobile", "default": false },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Notification creation timestamp" }
+      },
+      "relations": {
+        "user": { "type": "ManyToOne", "entity": "User", "description": "The notification recipient" }
+      },
+      "indexes": ["userId", "isRead", "type", "createdAt"],
+      "dtos": {
+        "CreateDto": {
+          "userId": { "type": "string", "required": true, "validation": ["IsUUID"] },
+          "type": { "type": "enum", "required": true, "validation": ["IsEnum(NotificationType)"] },
+          "title": { "type": "string", "required": true, "validation": ["IsString", "MaxLength(200)"] },
+          "body": { "type": "string", "required": true, "validation": ["IsString", "MaxLength(500)"] },
+          "data": { "type": "object", "required": false, "validation": ["IsOptional", "IsObject"] },
+          "actionUrl": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(500)"] }
+        },
+        "MarkReadDto": {
+          "notificationIds": { "type": "string[]", "required": true, "validation": ["IsArray", "IsUUID({each:true})"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "data": { "type": "object | null" },
+          "isRead": { "type": "boolean" },
+          "readAt": { "type": "string | null" },
+          "actionUrl": { "type": "string | null" },
+          "createdAt": { "type": "string" }
+        }
+      }
+    },
+    "Tag": {
+      "description": "Flat taxonomy of searchable tags across the platform. Used for product discovery and portfolio filtering.",
+      "tableName": "tags",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "name": { "type": "varchar(100)", "required": true, "description": "Display name of the tag e.g. 'Bali'" },
+        "slug": { "type": "varchar(120)", "required": true, "description": "URL-safe unique slug e.g. 'bali'" },
+        "type": { "type": "enum(DESTINATION,STYLE,PRODUCT_TYPE,GENERAL)", "required": true, "description": "Tag category for filtered search" },
+        "usageCount": { "type": "integer", "required": true, "description": "Number of entities using this tag (denormalized for autocomplete ranking)", "default": 0 },
+        "imageUrl": { "type": "varchar(500)", "required": false, "description": "Optional illustration for destination/style tags shown on explore page" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Tag creation timestamp" }
+      },
+      "relations": {},
+      "indexes": ["slug (unique)", "type", "usageCount", "name (full-text)"],
+      "dtos": {
+        "CreateDto": {
+          "name": { "type": "string", "required": true, "validation": ["IsString", "MinLength(1)", "MaxLength(100)"] },
+          "type": { "type": "enum", "required": true, "validation": ["IsEnum(TagType)"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "type": { "type": "string" },
+          "usageCount": { "type": "number" },
+          "imageUrl": { "type": "string | null" },
+          "createdAt": { "type": "string" }
+        }
+      }
+    },
+    "Category": {
+      "description": "Hierarchical product and content categories. Supports parent-child nesting for sub-categories.",
+      "tableName": "categories",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "name": { "type": "varchar(100)", "required": true, "description": "Category display name" },
+        "slug": { "type": "varchar(120)", "required": true, "description": "URL-safe unique slug" },
+        "description": { "type": "text", "required": false, "description": "Optional category description" },
+        "parentId": { "type": "uuid", "required": false, "description": "Self-referential foreign key to categories.id for sub-categories. Null = top-level" },
+        "imageUrl": { "type": "varchar(500)", "required": false, "description": "Category illustration or icon URL" },
+        "sortOrder": { "type": "integer", "required": true, "description": "Sort position within siblings", "default": 0 },
+        "isActive": { "type": "boolean", "required": true, "description": "Whether category is visible in navigation", "default": true },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Creation timestamp" }
+      },
+      "relations": {
+        "parent": { "type": "ManyToOne", "entity": "Category", "description": "Parent category (self-referential)" },
+        "children": { "type": "OneToMany", "entity": "Category", "description": "Child sub-categories" }
+      },
+      "indexes": ["slug (unique)", "parentId", "isActive", "sortOrder"],
+      "dtos": {
+        "CreateDto": {
+          "name": { "type": "string", "required": true, "validation": ["IsString", "MaxLength(100)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(2000)"] },
+          "parentId": { "type": "string", "required": false, "validation": ["IsOptional", "IsUUID"] },
+          "imageUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl"] },
+          "sortOrder": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt", "Min(0)"] }
+        },
+        "UpdateDto": {
+          "name": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(100)"] },
+          "description": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(2000)"] },
+          "imageUrl": { "type": "string", "required": false, "validation": ["IsOptional", "IsUrl"] },
+          "sortOrder": { "type": "number", "required": false, "validation": ["IsOptional", "IsInt"] },
+          "isActive": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "description": { "type": "string | null" },
+          "parentId": { "type": "string | null" },
+          "imageUrl": { "type": "string | null" },
+          "sortOrder": { "type": "number" },
+          "isActive": { "type": "boolean" },
+          "children": { "type": "CategoryResponseDto[]" },
+          "createdAt": { "type": "string" }
+        }
+      }
+    },
+    "UserAddress": {
+      "description": "Saved addresses for a user. Used for physical product delivery and tax calculation.",
+      "tableName": "user_addresses",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "userId": { "type": "uuid", "required": true, "description": "Foreign key to users.id" },
+        "label": { "type": "enum(HOME,WORK,OTHER)", "required": true, "description": "Address label for user display", "default": "HOME" },
+        "fullName": { "type": "varchar(200)", "required": true, "description": "Recipient full name" },
+        "street": { "type": "varchar(255)", "required": true, "description": "Street address line 1 (and line 2 if needed)" },
+        "city": { "type": "varchar(100)", "required": true, "description": "City name" },
+        "state": { "type": "varchar(100)", "required": false, "description": "State or province (optional for some countries)" },
+        "country": { "type": "varchar(2)", "required": true, "description": "ISO 3166-1 alpha-2 country code e.g. US, GB, AU" },
+        "postalCode": { "type": "varchar(20)", "required": true, "description": "Postal / ZIP code" },
+        "isDefault": { "type": "boolean", "required": true, "description": "Whether this is the user's default shipping address", "default": false },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "required": true, "description": "Last update timestamp" }
+      },
+      "relations": {
+        "user": { "type": "ManyToOne", "entity": "User", "description": "The address owner" }
+      },
+      "indexes": ["userId", "isDefault"],
+      "dtos": {
+        "CreateDto": {
+          "label": { "type": "enum", "required": false, "validation": ["IsOptional", "IsEnum(AddressLabel)"], "default": "HOME" },
+          "fullName": { "type": "string", "required": true, "validation": ["IsString", "MaxLength(200)"] },
+          "street": { "type": "string", "required": true, "validation": ["IsString", "MaxLength(255)"] },
+          "city": { "type": "string", "required": true, "validation": ["IsString", "MaxLength(100)"] },
+          "state": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(100)"] },
+          "country": { "type": "string", "required": true, "validation": ["IsString", "Length(2,2)", "IsISO31661Alpha2"] },
+          "postalCode": { "type": "string", "required": true, "validation": ["IsString", "MaxLength(20)"] },
+          "isDefault": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"], "default": false }
+        },
+        "UpdateDto": {
+          "label": { "type": "enum", "required": false, "validation": ["IsOptional", "IsEnum(AddressLabel)"] },
+          "fullName": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(200)"] },
+          "street": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(255)"] },
+          "city": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(100)"] },
+          "state": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(100)"] },
+          "country": { "type": "string", "required": false, "validation": ["IsOptional", "Length(2,2)"] },
+          "postalCode": { "type": "string", "required": false, "validation": ["IsOptional", "MaxLength(20)"] },
+          "isDefault": { "type": "boolean", "required": false, "validation": ["IsOptional", "IsBoolean"] }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "label": { "type": "string" },
+          "fullName": { "type": "string" },
+          "street": { "type": "string" },
+          "city": { "type": "string" },
+          "state": { "type": "string | null" },
+          "country": { "type": "string" },
+          "postalCode": { "type": "string" },
+          "isDefault": { "type": "boolean" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "CreatorAnalytics": {
+      "description": "Daily aggregated analytics snapshot for a creator. One row per creator per day, captured by a scheduled background job.",
+      "tableName": "creator_analytics",
+      "fields": {
+        "id": { "type": "uuid", "required": true, "description": "Primary key" },
+        "creatorId": { "type": "uuid", "required": true, "description": "Foreign key to creator_profiles.id" },
+        "date": { "type": "date", "required": true, "description": "Calendar date this snapshot covers (YYYY-MM-DD)" },
+        "profileViews": { "type": "integer", "required": true, "description": "Number of unique profile page views on this date", "default": 0 },
+        "storefrontViews": { "type": "integer", "required": true, "description": "Number of unique storefront page views", "default": 0 },
+        "productViews": { "type": "integer", "required": true, "description": "Total product detail page views across all products", "default": 0 },
+        "portfolioViews": { "type": "integer", "required": true, "description": "Total portfolio views on this date", "default": 0 },
+        "revenue": { "type": "decimal(10,2)", "required": true, "description": "Total revenue earned on this date", "default": 0 },
+        "orderCount": { "type": "integer", "required": true, "description": "Number of completed orders on this date", "default": 0 },
+        "newFollowers": { "type": "integer", "required": true, "description": "Net new followers gained on this date", "default": 0 },
+        "newSubscribers": { "type": "integer", "required": true, "description": "Net new paid subscribers on this date", "default": 0 },
+        "conversionRate": { "type": "decimal(5,4)", "required": false, "description": "Storefront views to orders conversion rate (computed)" },
+        "createdAt": { "type": "timestamp", "required": true, "description": "Record creation timestamp" }
+      },
+      "relations": {
+        "creator": { "type": "ManyToOne", "entity": "CreatorProfile", "description": "The creator this analytics snapshot belongs to" }
+      },
+      "indexes": ["creatorId + date (unique composite)", "date"],
+      "dtos": {
+        "QueryDto": {
+          "startDate": { "type": "string", "required": true, "validation": ["IsDateString"] },
+          "endDate": { "type": "string", "required": true, "validation": ["IsDateString"] },
+          "groupBy": { "type": "enum(DAY,WEEK,MONTH)", "required": false, "validation": ["IsOptional", "IsEnum"], "default": "DAY" }
+        },
+        "ResponseDto": {
+          "id": { "type": "string" },
+          "creatorId": { "type": "string" },
+          "date": { "type": "string" },
+          "profileViews": { "type": "number" },
+          "storefrontViews": { "type": "number" },
+          "productViews": { "type": "number" },
+          "portfolioViews": { "type": "number" },
+          "revenue": { "type": "number" },
+          "orderCount": { "type": "number" },
+          "newFollowers": { "type": "number" },
+          "newSubscribers": { "type": "number" },
+          "conversionRate": { "type": "number | null" },
+          "createdAt": { "type": "string" }
+        },
+        "SummaryResponseDto": {
+          "totalRevenue": { "type": "number" },
+          "totalOrders": { "type": "number" },
+          "totalProfileViews": { "type": "number" },
+          "totalStorefrontViews": { "type": "number" },
+          "totalNewFollowers": { "type": "number" },
+          "totalNewSubscribers": { "type": "number" },
+          "averageConversionRate": { "type": "number" },
+          "dailyBreakdown": { "type": "CreatorAnalyticsResponseDto[]" }
+        }
+      }
+    }
+  },
+  "enums": {
+    "UserRole": ["USER", "CREATOR", "ADMIN"],
+    "CreatorTier": ["BASIC", "PRO", "PREMIUM"],
+    "StripeAccountStatus": ["PENDING", "ACTIVE", "RESTRICTED", "DISABLED"],
+    "ProductType": ["ITINERARY", "PHOTO_PRESET", "TRAVEL_GUIDE", "EXPERIENCE", "DIGITAL_DOWNLOAD", "CONSULTATION"],
+    "OrderStatus": ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "REFUNDED"],
+    "ReviewTargetType": ["PRODUCT", "CREATOR"],
+    "SubscriptionPlanType": ["CREATOR_TIER", "USER_PREMIUM", "USER_CREATOR"],
+    "SubscriptionTier": ["BASIC", "PRO", "PREMIUM"],
+    "BillingPeriod": ["MONTHLY", "YEARLY"],
+    "SubscriptionStatus": ["ACTIVE", "INACTIVE", "CANCELLED", "PAST_DUE", "TRIALING", "EXPIRED"],
+    "MediaType": ["IMAGE", "VIDEO", "DOCUMENT", "AUDIO"],
+    "NotificationType": ["FOLLOW", "NEW_PRODUCT", "ORDER_STATUS", "SUBSCRIPTION", "REVIEW", "SYSTEM", "NEW_SUBSCRIBER", "PAYMENT_FAILED", "PAYOUT_SENT"],
+    "TagType": ["DESTINATION", "STYLE", "PRODUCT_TYPE", "GENERAL"],
+    "AddressLabel": ["HOME", "WORK", "OTHER"],
+    "AnalyticsGroupBy": ["DAY", "WEEK", "MONTH"]
+  }
+}
