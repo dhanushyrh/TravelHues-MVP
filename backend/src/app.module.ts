@@ -31,7 +31,7 @@ import { AdminModule } from './modules/admin/admin.module';
       isGlobal: true,
       load: [configuration],
       validationSchema,
-      validationOptions: { allowUnknown: false, abortEarly: true },
+      validationOptions: { allowUnknown: true, abortEarly: true },
     }),
 
     TypeOrmModule.forRootAsync({

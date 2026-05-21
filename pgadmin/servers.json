@@ -6,8 +6,8 @@
       "Host": "postgres",
       "Port": 5432,
       "MaintenanceDB": "travelhues_db",
-      "Username": "travelhues",
-      "Password": "travelhues_secret",
+      "Username": "admin@travelhues.com",
+      "Password": "admin123",
       "SSLMode": "prefer",
       "SavePassword": true
     }
