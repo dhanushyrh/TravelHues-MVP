@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
@@ -14,8 +14,6 @@ import {
   Globe2,
   Upload,
   X,
-  Plus,
-  Trash2,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -33,6 +31,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { productsApi } from '@/api/products.api';
 import { mediaApi } from '@/api/media.api';
+import {
+  ItineraryBuilder,
+  type ItineraryDetailsValue,
+} from '@/components/products/ItineraryBuilder';
 
 // ── Product types ─────────────────────────────────────────────────────────────
 type ProductType = 'activity' | 'stay' | 'itinerary' | 'package' | 'visa';
@@ -94,12 +96,6 @@ const productFormSchema = z.object({
   propertyType: z.string().optional(),
   starRating: z.coerce.number().optional(),
   address: z.string().optional(),
-  // Itinerary
-  totalDays: z.coerce.number().optional(),
-  highlights: z.string().optional(),
-  days: z
-    .array(z.object({ title: z.string(), description: z.string() }))
-    .optional(),
   // Package (uses duration, groupSize from above)
   // Visa
   fromCountry: z.string().optional(),
@@ -123,26 +119,18 @@ function ProductForm({ type }: { type: ProductType }) {
   const [amenities, setAmenities] = useState<string[]>([]);
   const [amenityInput, setAmenityInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [itineraryDetails, setItineraryDetails] = useState<ItineraryDetailsValue>({
+    days: [{ dayNumber: 1, title: 'Day 1', activities: [] }],
+  });
 
   const {
     register,
     handleSubmit,
-    control,
     setValue,
     formState: { errors },
   } = useForm<ProductFormData>({
     resolver: zodResolver(productFormSchema),
-    defaultValues:
-      type === 'itinerary'
-        ? { days: [{ title: 'Day 1', description: '' }] }
-        : {},
   });
-
-  const {
-    fields: dayFields,
-    append: addDay,
-    remove: removeDay,
-  } = useFieldArray({ control, name: 'days' });
 
   const handleCoverChange = useCallback((file: File) => {
     setCoverFile(file);
@@ -192,11 +180,14 @@ function ProductForm({ type }: { type: ProductType }) {
         if (data.address) payload.address = data.address;
         if (amenities.length > 0) payload.amenities = amenities;
       } else if (type === 'itinerary') {
-        if (data.totalDays) payload.totalDays = data.totalDays;
-        if (data.highlights)
-          payload.highlights = data.highlights.split(',').map((s) => s.trim()).filter(Boolean);
-        if (data.days)
-          payload.days = data.days.map((day, i) => ({ day: i + 1, ...day }));
+        payload.itineraryDetails = {
+          ...itineraryDetails,
+          totalDays: itineraryDetails.totalDays ?? itineraryDetails.days?.length,
+          days: (itineraryDetails.days ?? []).map((day, i) => ({
+            ...day,
+            dayNumber: i + 1,
+          })),
+        };
       } else if (type === 'package') {
         if (data.duration) payload.duration = data.duration;
         if (data.groupSize) payload.groupSize = data.groupSize;
@@ -529,77 +520,10 @@ function ProductForm({ type }: { type: ProductType }) {
 
       {/* Itinerary-specific */}
       {type === 'itinerary' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Itinerary Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>
-                Total Days <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                type="number"
-                min="1"
-                placeholder="7"
-                {...register('totalDays')}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Highlights (comma-separated)</Label>
-              <Input
-                placeholder="e.g. Taj Mahal, Jaipur Palace, Varanasi Ghats"
-                {...register('highlights')}
-              />
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Day-by-Day Plan</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    addDay({ title: `Day ${dayFields.length + 1}`, description: '' })
-                  }
-                >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  Add Day
-                </Button>
-              </div>
-              {dayFields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="p-4 border border-gray-200 rounded-lg space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-primary-600">
-                      Day {index + 1}
-                    </span>
-                    {dayFields.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeDay(index)}
-                        className="text-red-400 hover:text-red-600"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                  <Input
-                    placeholder="Day title (e.g. Arrival in Delhi)"
-                    {...register(`days.${index}.title`)}
-                  />
-                  <Textarea
-                    rows={2}
-                    placeholder="What happens this day..."
-                    {...register(`days.${index}.description`)}
-                  />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <ItineraryBuilder
+          value={itineraryDetails}
+          onChange={setItineraryDetails}
+        />
       )}
 
       {/* Package-specific */}

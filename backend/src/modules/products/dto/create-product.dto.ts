@@ -82,14 +82,43 @@ export class StayDetailsDto {
   pricePerNight?: number;
 }
 
+export class ItineraryActivityDto {
+  @IsOptional() @IsString() time?: string;
+  @IsOptional() @IsString() title?: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() duration?: string;
+  @IsOptional() @IsString() cost?: string;
+}
+
+export class ItineraryDayDto {
+  @IsOptional() @IsNumber()  dayNumber?: number;
+  @IsOptional() @IsString()  title?: string;
+  @IsOptional() @IsString()  description?: string;
+  @IsOptional() @IsString()  location?: string;
+  @IsOptional() @IsString()  accommodation?: string;
+  @IsOptional() @IsString()  transport?: string;
+  @IsOptional() @IsString()  meals?: string;
+  @IsOptional() @IsString()  estimatedCost?: string;
+  @IsOptional() @IsString()  tips?: string;
+  @IsOptional() @IsString()  imageUrl?: string;
+  @IsOptional() @IsArray()   activities?: ItineraryActivityDto[];
+}
+
 export class ItineraryDetailsDto {
-  @IsOptional()
-  @IsNumber()
-  totalDays?: number;
+  @IsOptional() @IsNumber()  totalDays?: number;
+  @IsOptional() @IsNumber()  totalNights?: number;
+  @IsOptional() @IsString()  startingCity?: string;
+  @IsOptional() @IsString()  endingCity?: string;
+  @IsOptional() @IsString()  difficultyLevel?: string;
+  @IsOptional() @IsString()  bestSeason?: string;
+  @IsOptional() @IsString()  estimatedBudget?: string;
+  @IsOptional() @IsString()  packingList?: string;
+  @IsOptional() @IsBoolean() isCustomizable?: boolean;
 
   @IsOptional()
-  @IsNumber()
-  totalNights?: number;
+  @IsArray()
+  @IsString({ each: true })
+  destinations?: string[];
 
   @IsOptional()
   @IsArray()
@@ -102,12 +131,10 @@ export class ItineraryDetailsDto {
   excludes?: string[];
 
   @IsOptional()
-  @IsString()
-  estimatedBudget?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  isCustomizable?: boolean;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ItineraryDayDto)
+  days?: ItineraryDayDto[];
 }
 
 export class CreateProductDto {

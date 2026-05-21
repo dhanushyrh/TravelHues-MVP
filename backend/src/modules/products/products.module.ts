@@ -6,6 +6,7 @@ import { Product } from '../../database/entities/product.entity';
 import { Activity } from '../../database/entities/activity.entity';
 import { Stay } from '../../database/entities/stay.entity';
 import { Itinerary } from '../../database/entities/itinerary.entity';
+import { ItineraryDay } from '../../database/entities/itinerary-day.entity';
 import { Review } from '../../database/entities/review.entity';
 import { CreatorProfile } from '../../database/entities/creator-profile.entity';
 import { Tag } from '../../database/entities/tag.entity';
@@ -17,6 +18,7 @@ import { Tag } from '../../database/entities/tag.entity';
       Activity,
       Stay,
       Itinerary,
+      ItineraryDay,
       Review,
       CreatorProfile,
       Tag,

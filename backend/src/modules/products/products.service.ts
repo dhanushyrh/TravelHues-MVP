@@ -9,6 +9,7 @@ import { Product } from '../../database/entities/product.entity';
 import { Activity } from '../../database/entities/activity.entity';
 import { Stay } from '../../database/entities/stay.entity';
 import { Itinerary } from '../../database/entities/itinerary.entity';
+import { ItineraryDay } from '../../database/entities/itinerary-day.entity';
 import { Review } from '../../database/entities/review.entity';
 import { CreatorProfile } from '../../database/entities/creator-profile.entity';
 import { Tag } from '../../database/entities/tag.entity';
@@ -35,6 +36,8 @@ export class ProductsService {
     private readonly creatorRepository: Repository<CreatorProfile>,
     @InjectRepository(Tag)
     private readonly tagRepository: Repository<Tag>,
+    @InjectRepository(ItineraryDay)
+    private readonly itineraryDayRepository: Repository<ItineraryDay>,
   ) {}
 
   async create(userId: string, dto: CreateProductDto): Promise<Product> {
@@ -73,11 +76,23 @@ export class ProductsService {
       });
       await this.stayRepository.save(stay);
     } else if (dto.type === ProductType.ITINERARY && itineraryDetails) {
+      const { days, ...itineraryMeta } = itineraryDetails as any;
       const itinerary = this.itineraryRepository.create({
-        ...itineraryDetails,
+        ...itineraryMeta,
         productId: savedProduct.id,
       });
-      await this.itineraryRepository.save(itinerary);
+      const savedItinerary = await this.itineraryRepository.save(itinerary);
+
+      if (days?.length) {
+        const dayEntities = (days as any[]).map((day: any, idx: number) =>
+          this.itineraryDayRepository.create({
+            ...day,
+            dayNumber: day.dayNumber ?? idx + 1,
+            itineraryId: savedItinerary.id,
+          }),
+        );
+        await this.itineraryDayRepository.save(dayEntities);
+      }
     }
 
     if (dto.isPublished) {
