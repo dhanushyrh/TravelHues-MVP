@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Globe, ChevronRight, ChevronLeft, X, Upload, Check, SkipForward } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Globe, ChevronRight, ChevronLeft, X, Upload, Check, SkipForward, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { creatorsApi } from '@/api/creators.api';
 import { mediaApi } from '@/api/media.api';
+import { destinationsApi } from '@/api/destinations.api';
 import type { OnboardingData } from '@/types';
 
 const SPECIALTIES = [
@@ -58,7 +60,34 @@ export default function OnboardingPage() {
   // Step 2 data
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [destinations, setDestinations] = useState<string[]>([]);
-  const [destinationInput, setDestinationInput] = useState('');
+  const [destSearch, setDestSearch] = useState('');
+
+  const { data: countriesRes } = useQuery({
+    queryKey: ['destinations', 'countries'],
+    queryFn: () => destinationsApi.listCountries(),
+    staleTime: Infinity,
+  });
+  const { data: citiesRes } = useQuery({
+    queryKey: ['destinations', 'cities'],
+    queryFn: () => destinationsApi.listCities(),
+    staleTime: Infinity,
+  });
+
+  const allPlaces = useMemo(() => {
+    const countries: Array<{ id: string; name: string; label: string }> =
+      (countriesRes?.data?.data?.data ?? countriesRes?.data?.data ?? countriesRes?.data ?? [])
+        .map((c: any) => ({ id: c.id, name: c.name, label: c.name }));
+    const cities: Array<{ id: string; name: string; label: string }> =
+      (citiesRes?.data?.data?.data ?? citiesRes?.data?.data ?? citiesRes?.data ?? [])
+        .map((c: any) => ({ id: c.id, name: c.name, label: c.name }));
+    return [...countries, ...cities];
+  }, [countriesRes, citiesRes]);
+
+  const filteredPlaces = useMemo(() => {
+    if (!destSearch.trim()) return allPlaces.slice(0, 30);
+    const q = destSearch.toLowerCase();
+    return allPlaces.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 30);
+  }, [allPlaces, destSearch]);
 
   // Step 3 data
   const step3Form = useForm<Step3Data>({ resolver: zodResolver(step3Schema) });
@@ -82,12 +111,10 @@ export default function OnboardingPage() {
     );
   };
 
-  const addDestination = () => {
-    const val = destinationInput.trim();
-    if (val && !destinations.includes(val)) {
-      setDestinations([...destinations, val]);
-    }
-    setDestinationInput('');
+  const toggleDestination = (name: string) => {
+    setDestinations((prev) =>
+      prev.includes(name) ? prev.filter((d) => d !== name) : [...prev, name]
+    );
   };
 
   const removeDestination = (d: string) => {
@@ -313,41 +340,58 @@ export default function OnboardingPage() {
                 <Label className="text-sm font-semibold text-gray-700 mb-3 block">
                   Primary Destinations
                 </Label>
-                <div className="flex gap-2 mb-3">
-                  <Input
-                    placeholder="e.g. Bali, Indonesia"
-                    value={destinationInput}
-                    onChange={(e) => setDestinationInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addDestination();
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" onClick={addDestination}>
-                    Add
-                  </Button>
-                </div>
+
+                {/* Selected chips */}
                 {destinations.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {destinations.map((d) => (
                       <span
                         key={d}
-                        className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-primary-700 rounded-full text-sm font-medium"
+                        className="flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 border border-red-100 rounded-full text-sm font-medium"
                       >
+                        <Globe className="w-3 h-3" />
                         {d}
-                        <button
-                          type="button"
-                          onClick={() => removeDestination(d)}
-                          className="hover:text-primary-900"
-                        >
+                        <button type="button" onClick={() => removeDestination(d)} className="hover:text-red-900 ml-0.5">
                           <X className="w-3 h-3" />
                         </button>
                       </span>
                     ))}
                   </div>
                 )}
+
+                {/* Search box */}
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search countries or cities…"
+                    value={destSearch}
+                    onChange={(e) => setDestSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                {/* Scrollable list */}
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50">
+                  {filteredPlaces.length === 0 ? (
+                    <p className="text-center text-sm text-gray-400 py-4">No results</p>
+                  ) : (
+                    filteredPlaces.map((place) => (
+                      <button
+                        key={place.id}
+                        type="button"
+                        onClick={() => toggleDestination(place.name)}
+                        className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
+                          destinations.includes(place.name)
+                            ? 'bg-red-50 text-red-700 font-medium'
+                            : 'text-gray-700 hover:bg-white'
+                        }`}
+                      >
+                        {destinations.includes(place.name) && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                        {place.name}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
 

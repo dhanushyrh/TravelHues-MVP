@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { creatorsApi } from '@/api/creators.api';
 import { useAuthStore } from '@/store/auth.store';
+import { DestinationsMap } from '@/components/ui/DestinationsMap';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import type { DashboardStats } from '@/types';
 
@@ -231,6 +232,18 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Destinations Map */}
+        {data?.destinations && data.destinations.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold">Your Destinations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DestinationsMap destinations={data.destinations} height="300px" />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AppLayout>
   );

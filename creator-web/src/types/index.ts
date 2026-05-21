@@ -94,6 +94,7 @@ export interface DashboardStats {
   publishedProducts: number;
   revenueThisMonth: number;
   recentContent: Content[];
+  destinations?: string[];
 }
 
 export interface AnalyticsData {
