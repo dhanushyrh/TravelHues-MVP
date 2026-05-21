@@ -103,6 +103,7 @@ export enum MediaType {
 
 export enum InviteStatus {
   PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  DECLINED = 'declined',
+  USED = 'used',
+  REVOKED = 'revoked',
+  EXPIRED = 'expired',
 }

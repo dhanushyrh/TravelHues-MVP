@@ -6,7 +6,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation.schema';
-import { databaseConfig } from './config/database.config';
+import { DatabaseConfigService } from './config/database.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CreatorsModule } from './modules/creators/creators.module';
@@ -21,6 +21,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { MediaModule } from './modules/media/media.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -32,8 +33,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     }),
 
     TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: databaseConfig,
+      useClass: DatabaseConfigService,
     }),
 
     ThrottlerModule.forRootAsync({
@@ -79,6 +79,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     MediaModule,
     NotificationsModule,
     ReviewsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

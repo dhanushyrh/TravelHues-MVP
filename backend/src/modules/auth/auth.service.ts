@@ -13,9 +13,12 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service';
+import { AdminService } from '../admin/admin.service';
+import { CreatorProfile } from '../../database/entities/creator-profile.entity';
 import { User } from '../../database/entities/user.entity';
-import { UserRole } from '../../common/enums';
+import { UserRole, CreatorTier } from '../../common/enums';
 import { RegisterDto } from './dto/register.dto';
+import { RegisterCreatorDto } from './dto/register-creator.dto';
 import { LoginDto } from './dto/login.dto';
 
 export interface TokenPair {
@@ -35,7 +38,10 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(CreatorProfile)
+    private readonly creatorProfileRepository: Repository<CreatorProfile>,
     private readonly usersService: UsersService,
+    private readonly adminService: AdminService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -271,6 +277,62 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async registerCreator(dto: RegisterCreatorDto): Promise<AuthResponse> {
+    // Validate invite before creating user
+    const inviteCheck = await this.adminService.validateInviteToken(dto.inviteToken);
+    if (!inviteCheck.valid) {
+      const messages: Record<string, string> = {
+        not_found: 'Invalid invite token',
+        already_used: 'This invite has already been used',
+        revoked: 'This invite has been revoked',
+        expired: 'This invite has expired',
+      };
+      throw new BadRequestException(messages[inviteCheck.reason] ?? 'Invalid invite');
+    }
+    if (inviteCheck.email !== dto.email.toLowerCase()) {
+      throw new BadRequestException('Email does not match the invite');
+    }
+
+    const existingUser = await this.usersService.findByEmail(dto.email);
+    if (existingUser) throw new ConflictException('An account with this email already exists');
+
+    const passwordHash = await bcrypt.hash(dto.password, this.SALT_ROUNDS);
+
+    const user = await this.userRepository.save(
+      this.userRepository.create({
+        email: dto.email.toLowerCase().trim(),
+        passwordHash,
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        role: UserRole.CREATOR,
+        isEmailVerified: true, // Invite validates the email
+      }),
+    );
+
+    // Create empty creator profile
+    await this.creatorProfileRepository.save(
+      this.creatorProfileRepository.create({
+        userId: user.id,
+        displayName: `${user.firstName} ${user.lastName}`.trim(),
+        tier: CreatorTier.BASIC,
+        isOnboardingComplete: false,
+      }),
+    );
+
+    // Mark invite as used
+    await this.adminService.validateAndUseInvite(dto.inviteToken, dto.email, user.id);
+
+    const tokens = await this.generateTokens(user);
+    await this.storeRefreshToken(user.id, tokens.refreshToken);
+
+    const { passwordHash: _, refreshTokenHash: __, ...safeUser } = user as any;
+    return { ...tokens, user: safeUser };
+  }
+
+  async validateInviteToken(token: string) {
+    return this.adminService.validateInviteToken(token);
   }
 
   private async storeRefreshToken(userId: string, refreshToken: string): Promise<void> {

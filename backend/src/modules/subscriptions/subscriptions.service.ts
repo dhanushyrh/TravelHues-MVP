@@ -15,23 +15,28 @@ export class SubscriptionsService {
   async getPlans() {
     return this.planRepository.find({
       where: { isActive: true },
-      order: { sortOrder: 'ASC' },
+      order: { price: 'ASC' },
     });
   }
 
-  async getUserSubscriptions(userId: string) {
+  async getUserSubscriptions(subscriberId: string) {
     return this.subscriptionRepository.find({
-      where: { subscriberId: userId, status: SubscriptionStatus.ACTIVE },
+      where: { subscriberId, status: SubscriptionStatus.ACTIVE },
       relations: ['plan'],
     });
   }
 
-  async subscribe(userId: string, planId: string, creatorId?: string) {
+  async subscribe(subscriberId: string, planId: string, creatorId?: string) {
     const plan = await this.planRepository.findOne({ where: { id: planId, isActive: true } });
     if (!plan) throw new NotFoundException('Subscription plan not found');
 
     const existing = await this.subscriptionRepository.findOne({
-      where: { subscriberId: userId, planId, creatorId: creatorId ?? null, status: SubscriptionStatus.ACTIVE },
+      where: {
+        subscriberId,
+        planId,
+        ...(creatorId ? { creatorId } : {}),
+        status: SubscriptionStatus.ACTIVE,
+      },
     });
     if (existing) throw new ConflictException('Already subscribed to this plan');
 
@@ -40,8 +45,9 @@ export class SubscriptionsService {
     periodEnd.setMonth(periodEnd.getMonth() + (plan.billingPeriod === 'yearly' ? 12 : 1));
 
     const subscription = this.subscriptionRepository.create({
-      subscriberId: userId,
+      subscriberId,
       planId,
+      planType: plan.type,
       creatorId,
       status: SubscriptionStatus.ACTIVE,
       currentPeriodStart: now,
@@ -51,14 +57,15 @@ export class SubscriptionsService {
     return this.subscriptionRepository.save(subscription);
   }
 
-  async cancel(id: string, userId: string) {
+  async cancel(id: string, subscriberId: string) {
     const subscription = await this.subscriptionRepository.findOne({
-      where: { id, subscriberId: userId },
+      where: { id, subscriberId },
     });
     if (!subscription) throw new NotFoundException('Subscription not found');
 
     subscription.status = SubscriptionStatus.CANCELLED;
     subscription.cancelAtPeriodEnd = true;
+    subscription.cancelledAt = new Date();
     return this.subscriptionRepository.save(subscription);
   }
 }

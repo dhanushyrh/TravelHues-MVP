@@ -39,13 +39,18 @@ export class OrdersService {
   async create(userId: string, items: { productId: string; quantity: number }[]) {
     const products = await Promise.all(
       items.map(async (item) => {
-        const product = await this.productRepository.findOne({ where: { id: item.productId, isPublished: true } });
+        const product = await this.productRepository.findOne({
+          where: { id: item.productId, isPublished: true },
+        });
         if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
         return { product, quantity: item.quantity };
       }),
     );
 
-    const subtotal = products.reduce((sum, { product, quantity }) => sum + product.price * quantity, 0);
+    const subtotal = products.reduce(
+      (sum, { product, quantity }) => sum + Number(product.price) * quantity,
+      0,
+    );
 
     const order = this.orderRepository.create({
       userId,
@@ -62,10 +67,12 @@ export class OrdersService {
       this.orderItemRepository.create({
         orderId: savedOrder.id,
         productId: product.id,
-        creatorId: product.creatorId,
         quantity,
         unitPrice: product.price,
-        total: product.price * quantity,
+        totalPrice: Number(product.price) * quantity,
+        currency: 'INR',
+        productTitle: product.title,
+        productSnapshot: { id: product.id, title: product.title, price: product.price, type: product.type },
       }),
     );
 
