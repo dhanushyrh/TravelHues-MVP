@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import * as compression from 'compression';
@@ -19,7 +19,12 @@ async function bootstrap() {
   const env = configService.get<string>('app.env', 'development');
   const frontendUrl = configService.get<string>('app.frontendUrl', 'http://localhost:3001');
 
-  app.use(helmet());
+  // Relax CSP in dev so Swagger UI inline scripts load
+  app.use(
+    helmet({
+      contentSecurityPolicy: env === 'production',
+    }),
+  );
   app.use(compression());
 
   app.enableCors({
@@ -29,8 +34,8 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
+  // Version is already baked into the prefix — no need for URI versioning middleware
   app.setGlobalPrefix('api/v1');
-  app.enableVersioning({ type: VersioningType.URI });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -66,7 +71,8 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('api', app, document, {
+    // Use /docs to avoid any Express prefix-match clash with the api/v1 global prefix
+    SwaggerModule.setup('docs', app, document, {
       swaggerOptions: { persistAuthorization: true },
     });
   }
@@ -76,7 +82,7 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`TravelHues API running on http://localhost:${port}/api/v1`);
   if (env !== 'production') {
-    console.log(`Swagger docs at http://localhost:${port}/api`);
+    console.log(`Swagger docs at http://localhost:${port}/docs`);
   }
 }
 
