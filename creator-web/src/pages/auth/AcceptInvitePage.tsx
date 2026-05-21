@@ -34,7 +34,8 @@ interface InviteInfo {
 
 export default function AcceptInvitePage() {
   const navigate = useNavigate();
-  const search = useSearch({ from: '/auth/accept-invite' }) as { token?: string };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const search = useSearch({ strict: false }) as { token?: string };
   const token = search.token || '';
   const { setAuth } = useAuthStore();
 
