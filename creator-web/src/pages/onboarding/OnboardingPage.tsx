@@ -38,7 +38,6 @@ const step1Schema = z.object({
 const step3Schema = z.object({
   instagram: z.string().url('Enter a valid URL').or(z.literal('')).optional(),
   youtube: z.string().url('Enter a valid URL').or(z.literal('')).optional(),
-  tiktok: z.string().url('Enter a valid URL').or(z.literal('')).optional(),
   twitter: z.string().url('Enter a valid URL').or(z.literal('')).optional(),
   website: z.string().url('Enter a valid URL').or(z.literal('')).optional(),
 });
@@ -136,7 +135,6 @@ export default function OnboardingPage() {
       const socialLinks: Record<string, string> = {};
       if (step3Data.instagram) socialLinks.instagram = step3Data.instagram;
       if (step3Data.youtube) socialLinks.youtube = step3Data.youtube;
-      if (step3Data.tiktok) socialLinks.tiktok = step3Data.tiktok;
       if (step3Data.twitter) socialLinks.twitter = step3Data.twitter;
 
       const onboardingData: OnboardingData = {
@@ -378,7 +376,6 @@ export default function OnboardingPage() {
               {[
                 { id: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/yourhandle' },
                 { id: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@yourchannel' },
-                { id: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@yourhandle' },
                 { id: 'twitter', label: 'Twitter / X', placeholder: 'https://twitter.com/yourhandle' },
                 { id: 'website', label: 'Website', placeholder: 'https://yourwebsite.com' },
               ].map(({ id, label, placeholder }) => (

@@ -17,6 +17,10 @@ import ProductsPage from '@/pages/products/ProductsPage';
 import NewProductPage from '@/pages/products/NewProductPage';
 import StorefrontPage from '@/pages/storefront/StorefrontPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
+import AdminDashboardPage from '@/pages/admin/AdminDashboardPage';
+import AdminDestinationsPage from '@/pages/admin/AdminDestinationsPage';
+import AdminPlansPage from '@/pages/admin/AdminPlansPage';
+import AdminInvitesPage from '@/pages/admin/AdminInvitesPage';
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function requireAuth() {
@@ -24,6 +28,12 @@ function requireAuth() {
   if (!isAuthenticated) {
     throw redirect({ to: '/auth/login' });
   }
+}
+
+function requireAdmin() {
+  const { isAuthenticated, user } = useAuthStore.getState();
+  if (!isAuthenticated) throw redirect({ to: '/auth/login' });
+  if (user?.role !== 'admin') throw redirect({ to: '/dashboard' });
 }
 
 // ── Root route ────────────────────────────────────────────────────────────────
@@ -120,6 +130,35 @@ const settingsRoute = createRoute({
   beforeLoad: requireAuth,
 });
 
+// ── Admin routes ──────────────────────────────────────────────────────────────
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin',
+  component: AdminDashboardPage,
+  beforeLoad: requireAdmin,
+});
+
+const adminDestinationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/destinations',
+  component: AdminDestinationsPage,
+  beforeLoad: requireAdmin,
+});
+
+const adminPlansRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/plans',
+  component: AdminPlansPage,
+  beforeLoad: requireAdmin,
+});
+
+const adminInvitesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/invites',
+  component: AdminInvitesPage,
+  beforeLoad: requireAdmin,
+});
+
 // ── Router ────────────────────────────────────────────────────────────────────
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -133,6 +172,10 @@ const routeTree = rootRoute.addChildren([
   newProductRoute,
   storefrontRoute,
   settingsRoute,
+  adminRoute,
+  adminDestinationsRoute,
+  adminPlansRoute,
+  adminInvitesRoute,
 ]);
 
 export const router = createRouter({

@@ -14,6 +14,7 @@ import { Storefront } from '../../database/entities/storefront.entity';
 import { UserRole } from '../../common/enums';
 import { CreateCreatorProfileDto } from './dto/create-creator-profile.dto';
 import { UpdateCreatorProfileDto } from './dto/update-creator-profile.dto';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 import { PaginationDto, PaginatedResponseDto } from '../../common/dto/pagination.dto';
 
 @Injectable()
@@ -132,6 +133,31 @@ export class CreatorsService {
 
     const [data, total] = await qb.getManyAndCount();
     return PaginatedResponseDto.create(data, total, page, limit);
+  }
+
+  async completeOnboarding(userId: string, dto: CompleteOnboardingDto): Promise<CreatorProfile> {
+    const profile = await this.findOwnProfile(userId);
+
+    profile.displayName = dto.displayName;
+    if (dto.tagline !== undefined) profile.tagline = dto.tagline;
+    if (dto.bio !== undefined) profile.bio = dto.bio;
+    if (dto.location !== undefined) profile.location = dto.location;
+    if (dto.specialties) profile.specialties = dto.specialties;
+    if (dto.destinations) profile.destinationsFocused = dto.destinations;
+    if (dto.avatarUrl) profile.profileImageUrl = dto.avatarUrl;
+    if (dto.websiteUrl) profile.websiteUrl = dto.websiteUrl;
+    if (dto.socialLinks) {
+      if (dto.socialLinks.instagram) profile.instagramHandle = dto.socialLinks.instagram;
+      if (dto.socialLinks.youtube) profile.youtubeHandle = dto.socialLinks.youtube;
+    }
+
+    if (!profile.slug) {
+      const base = slugify(dto.displayName, { lower: true, strict: true });
+      profile.slug = await this.generateUniqueSlug(base, profile.id);
+    }
+
+    profile.isOnboardingComplete = true;
+    return this.creatorRepository.save(profile);
   }
 
   async updateProfile(userId: string, dto: UpdateCreatorProfileDto): Promise<CreatorProfile> {

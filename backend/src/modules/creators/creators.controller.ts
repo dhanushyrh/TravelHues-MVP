@@ -16,6 +16,7 @@ import {
 import { CreatorsService } from './creators.service';
 import { CreateCreatorProfileDto } from './dto/create-creator-profile.dto';
 import { UpdateCreatorProfileDto } from './dto/update-creator-profile.dto';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -37,6 +38,16 @@ export class CreatorsController {
     @Body() dto: CreateCreatorProfileDto,
   ) {
     return this.creatorsService.applyToBeCreator(user.id, dto);
+  }
+
+  @Post('onboarding')
+  @Roles(UserRole.CREATOR)
+  @ApiOperation({ summary: 'Complete creator onboarding' })
+  async completeOnboarding(
+    @CurrentUser() user: User,
+    @Body() dto: CompleteOnboardingDto,
+  ) {
+    return this.creatorsService.completeOnboarding(user.id, dto);
   }
 
   @Get('me')

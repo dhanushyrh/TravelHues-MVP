@@ -5,13 +5,18 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import slugify from 'slugify';
 import { CreatorInvite } from '../../database/entities/creator-invite.entity';
 import { User } from '../../database/entities/user.entity';
-import { InviteStatus } from '../../common/enums';
+import { Destination } from '../../database/entities/destination.entity';
+import { SubscriptionPlan } from '../../database/entities/subscription-plan.entity';
+import { InviteStatus, DestinationType } from '../../common/enums';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { CreateDestinationDto } from '../destinations/dto/create-destination.dto';
+import { UpsertSubscriptionPlanDto } from './dto/upsert-subscription-plan.dto';
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -22,6 +27,10 @@ export class AdminService {
     private readonly inviteRepository: Repository<CreatorInvite>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Destination)
+    private readonly destinationRepository: Repository<Destination>,
+    @InjectRepository(SubscriptionPlan)
+    private readonly planRepository: Repository<SubscriptionPlan>,
   ) {}
 
   async createInvite(dto: CreateInviteDto, adminId: string): Promise<CreatorInvite> {
@@ -135,5 +144,142 @@ export class AdminService {
       return { valid: false, reason: 'expired' };
     }
     return { valid: true, email: invite.email, expiresAt: invite.expiresAt };
+  }
+
+  // ── Destination management ─────────────────────────────────────────────────
+
+  async listAllDestinations(
+    filters: {
+      type?: DestinationType;
+      parentId?: string;
+      search?: string;
+      includeInactive?: boolean;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const { type, parentId, search, includeInactive = true, page = 1, limit = 20 } = filters;
+
+    const qb = this.destinationRepository
+      .createQueryBuilder('destination')
+      .leftJoinAndSelect('destination.parent', 'parent')
+      .leftJoinAndSelect('destination.children', 'children')
+      .orderBy('destination.name', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (!includeInactive) {
+      qb.andWhere('destination.isActive = :isActive', { isActive: true });
+    }
+    if (type) {
+      qb.andWhere('destination.type = :type', { type });
+    }
+    if (parentId) {
+      qb.andWhere('destination.parentId = :parentId', { parentId });
+    }
+    if (search) {
+      qb.andWhere('destination.name ILIKE :search', { search: `%${search}%` });
+    }
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, page, limit };
+  }
+
+  async createDestination(dto: CreateDestinationDto): Promise<Destination> {
+    const baseSlug = slugify(dto.name, { lower: true, strict: true });
+    let slug = baseSlug;
+    let counter = 1;
+
+    while (await this.destinationRepository.findOne({ where: { slug } })) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    const destination = this.destinationRepository.create({ ...dto, slug });
+    return this.destinationRepository.save(destination);
+  }
+
+  async updateDestination(id: string, dto: Partial<CreateDestinationDto>): Promise<Destination> {
+    const destination = await this.destinationRepository.findOne({ where: { id } });
+    if (!destination) throw new NotFoundException('Destination not found');
+
+    if (dto.name && dto.name !== destination.name) {
+      const baseSlug = slugify(dto.name, { lower: true, strict: true });
+      let slug = baseSlug;
+      let counter = 1;
+
+      while (true) {
+        const existing = await this.destinationRepository.findOne({ where: { slug } });
+        if (!existing || existing.id === id) break;
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+
+      destination.slug = slug;
+    }
+
+    Object.assign(destination, dto);
+    return this.destinationRepository.save(destination);
+  }
+
+  async toggleDestinationStatus(id: string): Promise<Destination> {
+    const destination = await this.destinationRepository.findOne({ where: { id } });
+    if (!destination) throw new NotFoundException('Destination not found');
+
+    destination.isActive = !destination.isActive;
+    return this.destinationRepository.save(destination);
+  }
+
+  async deleteDestination(id: string): Promise<{ success: boolean }> {
+    const destination = await this.destinationRepository.findOne({ where: { id } });
+    if (!destination) throw new NotFoundException('Destination not found');
+
+    await this.destinationRepository.remove(destination);
+    return { success: true };
+  }
+
+  async getDestinationTree(): Promise<Destination[]> {
+    return this.destinationRepository.find({
+      where: { type: DestinationType.COUNTRY },
+      relations: ['children', 'children.children'],
+      order: { name: 'ASC' },
+    });
+  }
+
+  // ── Subscription plan management ───────────────────────────────────────────
+
+  async listAllPlans(): Promise<SubscriptionPlan[]> {
+    return this.planRepository.find({
+      order: { price: 'ASC' },
+    });
+  }
+
+  async createPlan(dto: UpsertSubscriptionPlanDto): Promise<SubscriptionPlan> {
+    const plan = this.planRepository.create(dto);
+    return this.planRepository.save(plan);
+  }
+
+  async updatePlan(id: string, dto: Partial<UpsertSubscriptionPlanDto>): Promise<SubscriptionPlan> {
+    const plan = await this.planRepository.findOne({ where: { id } });
+    if (!plan) throw new NotFoundException('Subscription plan not found');
+
+    Object.assign(plan, dto);
+    return this.planRepository.save(plan);
+  }
+
+  async togglePlanStatus(id: string): Promise<SubscriptionPlan> {
+    const plan = await this.planRepository.findOne({ where: { id } });
+    if (!plan) throw new NotFoundException('Subscription plan not found');
+
+    plan.isActive = !plan.isActive;
+    return this.planRepository.save(plan);
+  }
+
+  async deletePlan(id: string): Promise<{ success: boolean }> {
+    const plan = await this.planRepository.findOne({ where: { id } });
+    if (!plan) throw new NotFoundException('Subscription plan not found');
+
+    await this.planRepository.remove(plan);
+    return { success: true };
   }
 }

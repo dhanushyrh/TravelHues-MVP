@@ -54,6 +54,12 @@ export class CreatorProfile {
   approvedAt: Date;
 
   @Column({ nullable: true })
+  tagline: string;
+
+  @Column({ nullable: true })
+  location: string;
+
+  @Column({ nullable: true })
   websiteUrl: string;
 
   @Column({ nullable: true })
