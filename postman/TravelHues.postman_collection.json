@@ -1,0 +1,1853 @@
+{
+  "info": {
+    "_postman_id": "travelhues-collection-v1",
+    "name": "TravelHues API",
+    "description": "Comprehensive API collection for TravelHues MVP. Base URL: http://localhost:3000/api/v1\n\nUse the 'TravelHues Local' environment. After Login or Register the accessToken and refreshToken collection variables are auto-populated.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "description": "Authentication endpoints — register, login, token refresh, password reset, email verification.",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\"\n}"
+            },
+            "description": "Register a new regular user account."
+          }
+        },
+        {
+          "name": "Register as Creator (with Invite)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const res = pm.response.json();",
+                  "    if (res.data?.accessToken) {",
+                  "        pm.collectionVariables.set(\"accessToken\", res.data.accessToken);",
+                  "        pm.collectionVariables.set(\"refreshToken\", res.data.refreshToken);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register/creator",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register", "creator"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inviteToken\": \"your-invite-token-here\",\n  \"email\": \"creator@example.com\",\n  \"password\": \"Password123!\",\n  \"firstName\": \"Alex\",\n  \"lastName\": \"Travel\"\n}"
+            },
+            "description": "Register as a creator using a valid invite token. Auto-saves accessToken and refreshToken on success."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const res = pm.response.json();",
+                  "    if (res.data?.accessToken) {",
+                  "        pm.collectionVariables.set(\"accessToken\", res.data.accessToken);",
+                  "        pm.collectionVariables.set(\"refreshToken\", res.data.refreshToken);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "description": "Login with email and password. Auto-saves accessToken and refreshToken on success."
+          }
+        },
+        {
+          "name": "Refresh Tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "description": "Exchange a refresh token for a new access/refresh token pair."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": "Invalidate the current session. Requires authentication."
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Get the authenticated user's details."
+          }
+        },
+        {
+          "name": "Validate Invite Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/invites/:token/validate",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "invites", ":token", "validate"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "your-invite-token-here",
+                  "description": "The invite token to validate"
+                }
+              ]
+            },
+            "description": "Check whether an invite token is valid before attempting creator registration."
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "forgot-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}"
+            },
+            "description": "Send a password-reset email to the specified address."
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "reset-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"password-reset-token-from-email\",\n  \"newPassword\": \"NewPassword123!\"\n}"
+            },
+            "description": "Reset the user's password using the token received via email."
+          }
+        },
+        {
+          "name": "Verify Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-email"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"email-verification-token\"\n}"
+            },
+            "description": "Verify the user's email address using the token received via email."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Admin",
+      "description": "Admin-only endpoints for managing creator invites. Requires ADMIN role.",
+      "item": [
+        {
+          "name": "Create Invite",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/invites",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "invites"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newcreator@example.com\",\n  \"notes\": \"Travel blogger from Mumbai with 50k followers\"\n}"
+            },
+            "description": "Generate a creator invite for the specified email address. Requires ADMIN role."
+          }
+        },
+        {
+          "name": "List Invites",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/invites?page=1&limit=20&status=PENDING",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "invites"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "PENDING", "description": "PENDING | USED | REVOKED" }
+              ]
+            },
+            "description": "Paginated list of creator invites. Filter by status: PENDING, USED, REVOKED. Requires ADMIN role."
+          }
+        },
+        {
+          "name": "Invite Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/invites/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "invites", "stats"]
+            },
+            "description": "Summary stats for all invites (total, pending, used, revoked). Requires ADMIN role."
+          }
+        },
+        {
+          "name": "Get Invite by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/invites/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "invites", ":id"],
+              "variable": [
+                { "key": "id", "value": "invite-uuid-here" }
+              ]
+            },
+            "description": "Fetch a single invite record by its ID. Requires ADMIN role."
+          }
+        },
+        {
+          "name": "Revoke Invite",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/invites/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "invites", ":id"],
+              "variable": [
+                { "key": "id", "value": "invite-uuid-here" }
+              ]
+            },
+            "description": "Permanently revoke an invite so it can no longer be used. Requires ADMIN role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Users",
+      "description": "User profile management endpoints.",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            },
+            "description": "Retrieve the authenticated user's full profile."
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"phone\": \"+919876543210\",\n  \"avatarUrl\": \"https://cdn.example.com/avatars/jane.jpg\"\n}"
+            },
+            "description": "Update the authenticated user's profile fields."
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            },
+            "description": "Permanently delete the authenticated user's account. This action is irreversible."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Creators",
+      "description": "Creator profile discovery and management.",
+      "item": [
+        {
+          "name": "Apply to Become Creator",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/creators/apply",
+              "host": ["{{baseUrl}}"],
+              "path": ["creators", "apply"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": "Submit an application to become a creator. Requires authentication."
+          }
+        },
+        {
+          "name": "Get My Creator Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/creators/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["creators", "me"]
+            },
+            "description": "Retrieve the authenticated creator's own profile."
+          }
+        },
+        {
+          "name": "Update My Creator Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/creators/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["creators", "me"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Alex Wanderlust\",\n  \"bio\": \"Solo traveller exploring offbeat destinations across South Asia.\",\n  \"tagline\": \"Adventure over comfort\",\n  \"specialties\": [\"trekking\", \"budget-travel\", \"solo-travel\"],\n  \"websiteUrl\": \"https://alexwanderlust.com\",\n  \"instagramHandle\": \"alexwanderlust\",\n  \"youtubeHandle\": \"alexwanderlust\"\n}"
+            },
+            "description": "Update the authenticated creator's public profile."
+          }
+        },
+        {
+          "name": "List Creators",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/creators?page=1&limit=20&destinationId=&specialty=trekking",
+              "host": ["{{baseUrl}}"],
+              "path": ["creators"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "destinationId", "value": "", "description": "Filter by destination UUID" },
+                { "key": "specialty", "value": "trekking", "description": "Filter by specialty tag" }
+              ]
+            },
+            "description": "Public paginated list of creators. Filter by destination or specialty."
+          }
+        },
+        {
+          "name": "Get Creator by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/creators/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["creators", ":id"],
+              "variable": [
+                { "key": "id", "value": "creator-uuid-here" }
+              ]
+            },
+            "description": "Public endpoint to view a creator's full profile."
+          }
+        },
+        {
+          "name": "Get Creator's Content",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/creators/:id/content?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["creators", ":id", "content"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "id", "value": "creator-uuid-here" }
+              ]
+            },
+            "description": "List all reels and photos published by a creator."
+          }
+        },
+        {
+          "name": "Get Creator's Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/creators/:id/products?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["creators", ":id", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "id", "value": "creator-uuid-here" }
+              ]
+            },
+            "description": "List all products (activities, stays, itineraries, etc.) listed by a creator."
+          }
+        },
+        {
+          "name": "Get Creator's Tips",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/creators/:id/tips?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["creators", ":id", "tips"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "id", "value": "creator-uuid-here" }
+              ]
+            },
+            "description": "List all travel tips published by a creator."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Destinations",
+      "description": "Destination catalog — countries, regions, and cities.",
+      "item": [
+        {
+          "name": "List Destinations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/destinations?type=CITY&continent=ASIA&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations"],
+              "query": [
+                { "key": "type", "value": "CITY", "description": "COUNTRY | STATE | CITY | REGION" },
+                { "key": "continent", "value": "ASIA" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Public paginated list of all destinations. Filter by type or continent."
+          }
+        },
+        {
+          "name": "List Countries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/destinations/countries",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations", "countries"]
+            },
+            "description": "List all top-level country destinations."
+          }
+        },
+        {
+          "name": "Get Destination by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/destinations/:slug",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations", ":slug"],
+              "variable": [
+                { "key": "slug", "value": "goa" }
+              ]
+            },
+            "description": "Fetch a single destination by its URL slug."
+          }
+        },
+        {
+          "name": "Get Destination Content",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/destinations/:slug/content?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations", ":slug", "content"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "slug", "value": "goa" }
+              ]
+            },
+            "description": "List reels and photos tagged to this destination."
+          }
+        },
+        {
+          "name": "Get Destination Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/destinations/:slug/products?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations", ":slug", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "slug", "value": "goa" }
+              ]
+            },
+            "description": "List all purchasable products available at this destination."
+          }
+        },
+        {
+          "name": "Get Destination Creators",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/destinations/:slug/creators?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations", ":slug", "creators"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "slug", "value": "goa" }
+              ]
+            },
+            "description": "List creators who have content or products at this destination."
+          }
+        },
+        {
+          "name": "Get Destination Tips",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/destinations/:slug/tips?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations", ":slug", "tips"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "slug", "value": "goa" }
+              ]
+            },
+            "description": "List travel tips for this destination."
+          }
+        },
+        {
+          "name": "Create Destination (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/destinations",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Goa\",\n  \"slug\": \"goa\",\n  \"type\": \"STATE\",\n  \"parentId\": \"india-uuid-here\",\n  \"isoCode\": \"IN-GA\",\n  \"continent\": \"ASIA\",\n  \"description\": \"India's smallest state and a popular beach destination on the western coast.\"\n}"
+            },
+            "description": "Create a new destination entry. Requires ADMIN role."
+          }
+        },
+        {
+          "name": "Update Destination (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/destinations/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["destinations", ":id"],
+              "variable": [
+                { "key": "id", "value": "destination-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description for Goa.\",\n  \"coverImageUrl\": \"https://cdn.example.com/destinations/goa-cover.jpg\"\n}"
+            },
+            "description": "Update an existing destination. Requires ADMIN role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Content (Reels & Photos)",
+      "description": "Social content feed — upload, view, like, and comment on reels and photos.",
+      "item": [
+        {
+          "name": "Get Content Feed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/content?page=1&limit=20&destinationId=&type=REEL",
+              "host": ["{{baseUrl}}"],
+              "path": ["content"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "destinationId", "value": "", "description": "Filter by destination UUID" },
+                { "key": "type", "value": "REEL", "description": "REEL | PHOTO" }
+              ]
+            },
+            "description": "Public paginated content feed. Filter by destination or content type."
+          }
+        },
+        {
+          "name": "Upload Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/content",
+              "host": ["{{baseUrl}}"],
+              "path": ["content"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"REEL\",\n  \"title\": \"Sunrise at Triund\",\n  \"caption\": \"Woke up at 4am for this view — absolutely worth it! 🌅\",\n  \"destinationId\": \"destination-uuid-here\",\n  \"mediaUrls\": [\n    \"https://cdn.example.com/media/triund-sunrise.mp4\"\n  ],\n  \"tags\": [\"trekking\", \"himachal\", \"sunrise\", \"mountains\"]\n}"
+            },
+            "description": "Upload a new reel or photo. Requires CREATOR role."
+          }
+        },
+        {
+          "name": "Get Content by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/content/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["content", ":id"],
+              "variable": [
+                { "key": "id", "value": "content-uuid-here" }
+              ]
+            },
+            "description": "Fetch a single content item with full details."
+          }
+        },
+        {
+          "name": "Update Content",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/content/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["content", ":id"],
+              "variable": [
+                { "key": "id", "value": "content-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Title\",\n  \"caption\": \"Updated caption with more details.\",\n  \"tags\": [\"updated\", \"tag\"]\n}"
+            },
+            "description": "Update your own content item. Requires authentication and ownership."
+          }
+        },
+        {
+          "name": "Delete Content",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/content/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["content", ":id"],
+              "variable": [
+                { "key": "id", "value": "content-uuid-here" }
+              ]
+            },
+            "description": "Delete your own content item. Requires authentication and ownership."
+          }
+        },
+        {
+          "name": "Like Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/content/:id/like",
+              "host": ["{{baseUrl}}"],
+              "path": ["content", ":id", "like"],
+              "variable": [
+                { "key": "id", "value": "content-uuid-here" }
+              ]
+            },
+            "description": "Like a content item. Requires authentication."
+          }
+        },
+        {
+          "name": "Unlike Content",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/content/:id/like",
+              "host": ["{{baseUrl}}"],
+              "path": ["content", ":id", "like"],
+              "variable": [
+                { "key": "id", "value": "content-uuid-here" }
+              ]
+            },
+            "description": "Remove your like from a content item."
+          }
+        },
+        {
+          "name": "Get Comments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/content/:id/comments?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["content", ":id", "comments"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "id", "value": "content-uuid-here" }
+              ]
+            },
+            "description": "Paginated list of comments for a content item."
+          }
+        },
+        {
+          "name": "Add Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/content/:id/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["content", ":id", "comments"],
+              "variable": [
+                { "key": "id", "value": "content-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Stunning view! What time did you start the trek?\",\n  \"parentId\": null\n}"
+            },
+            "description": "Post a comment on a content item. Set parentId to reply to an existing comment. Requires authentication."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Tips",
+      "description": "Long-form travel tips and guides written by creators.",
+      "item": [
+        {
+          "name": "List Tips",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tips?page=1&limit=20&destinationId=&category=FOOD&creatorId=",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "destinationId", "value": "", "description": "Filter by destination UUID" },
+                { "key": "category", "value": "FOOD", "description": "FOOD | TRANSPORT | ACCOMMODATION | SAFETY | BUDGET | CULTURE | ADVENTURE" },
+                { "key": "creatorId", "value": "", "description": "Filter by creator UUID" }
+              ]
+            },
+            "description": "Public paginated list of travel tips. Filter by destination, category, or creator."
+          }
+        },
+        {
+          "name": "Create Tip",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tips",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Best Local Food Spots in Goa You Won't Find on Google\",\n  \"body\": \"After three months living in Goa, here are the hidden gems I discovered...\",\n  \"category\": \"FOOD\",\n  \"destinationId\": \"destination-uuid-here\",\n  \"coverImageUrl\": \"https://cdn.example.com/tips/goa-food-cover.jpg\",\n  \"isPublished\": true\n}"
+            },
+            "description": "Create a new travel tip. Requires CREATOR role."
+          }
+        },
+        {
+          "name": "Get Tip by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tips/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", ":id"],
+              "variable": [
+                { "key": "id", "value": "tip-uuid-here" }
+              ]
+            },
+            "description": "Fetch the full content of a single tip."
+          }
+        },
+        {
+          "name": "Update Tip",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tips/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", ":id"],
+              "variable": [
+                { "key": "id", "value": "tip-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Title\",\n  \"body\": \"Updated tip content...\",\n  \"isPublished\": true\n}"
+            },
+            "description": "Update your own tip. Requires authentication and ownership."
+          }
+        },
+        {
+          "name": "Delete Tip",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tips/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", ":id"],
+              "variable": [
+                { "key": "id", "value": "tip-uuid-here" }
+              ]
+            },
+            "description": "Delete your own tip. Requires authentication and ownership."
+          }
+        },
+        {
+          "name": "Like Tip",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tips/:id/like",
+              "host": ["{{baseUrl}}"],
+              "path": ["tips", ":id", "like"],
+              "variable": [
+                { "key": "id", "value": "tip-uuid-here" }
+              ]
+            },
+            "description": "Like a tip. Requires authentication."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Products",
+      "description": "Bookable products: activities, stays, itineraries, packages, and visa services.",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=20&type=activity&destinationId=&minPrice=&maxPrice=",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "type", "value": "activity", "description": "activity | stay | itinerary | package | visa_service" },
+                { "key": "destinationId", "value": "" },
+                { "key": "minPrice", "value": "" },
+                { "key": "maxPrice", "value": "" }
+              ]
+            },
+            "description": "Public paginated product listing. Filter by type, destination, and price range."
+          }
+        },
+        {
+          "name": "Create Product — Activity",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"activity\",\n  \"title\": \"Sunrise Trek to Triund\",\n  \"description\": \"A guided sunrise trek to the iconic Triund ridge with breathtaking views of the Dhauladhar range.\",\n  \"price\": 2500,\n  \"destinationId\": \"destination-uuid-here\",\n  \"duration\": 6,\n  \"difficulty\": \"MODERATE\",\n  \"groupSize\": 15,\n  \"meetingPoint\": \"McLeod Ganj Bus Stand\",\n  \"isPublished\": true\n}"
+            },
+            "description": "Create an activity product. Requires CREATOR role."
+          }
+        },
+        {
+          "name": "Create Product — Stay",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"stay\",\n  \"title\": \"Cliffside Villa Goa\",\n  \"description\": \"Luxurious villa perched on the cliffs of North Goa with private infinity pool.\",\n  \"price\": 8000,\n  \"destinationId\": \"destination-uuid-here\",\n  \"propertyType\": \"VILLA\",\n  \"starRating\": 4,\n  \"amenities\": [\"pool\", \"wifi\", \"ac\", \"breakfast\", \"parking\"],\n  \"address\": \"Anjuna Cliff Road, Anjuna, Goa\",\n  \"isPublished\": true\n}"
+            },
+            "description": "Create a stay/accommodation product. Requires CREATOR role."
+          }
+        },
+        {
+          "name": "Create Product — Itinerary",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"itinerary\",\n  \"title\": \"7 Days Rajasthan Royal Circuit\",\n  \"description\": \"Explore the golden triangle and beyond with this expertly crafted Rajasthan itinerary.\",\n  \"price\": 1500,\n  \"destinationId\": \"destination-uuid-here\",\n  \"totalDays\": 7,\n  \"highlights\": [\"Jaipur\", \"Jodhpur\", \"Jaisalmer\", \"Pushkar\"],\n  \"isPublished\": true\n}"
+            },
+            "description": "Create a downloadable itinerary product. Requires CREATOR role."
+          }
+        },
+        {
+          "name": "Create Product — Package",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"package\",\n  \"title\": \"Kerala Backwaters 5D4N\",\n  \"description\": \"An immersive 5-day journey through the serene backwaters of Kerala.\",\n  \"price\": 45000,\n  \"destinationId\": \"destination-uuid-here\",\n  \"duration\": 5,\n  \"groupSize\": 8,\n  \"inclusions\": [\"accommodation\", \"meals\", \"houseboat\", \"transfers\"],\n  \"isPublished\": true\n}"
+            },
+            "description": "Create an all-inclusive travel package. Requires CREATOR role."
+          }
+        },
+        {
+          "name": "Create Product — Visa Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"visa_service\",\n  \"title\": \"Thailand Tourist Visa Assistance\",\n  \"description\": \"End-to-end assistance for Thailand tourist visa from India — document prep, submission, and tracking.\",\n  \"price\": 2000,\n  \"destinationId\": \"destination-uuid-here\",\n  \"fromCountry\": \"IN\",\n  \"toCountry\": \"TH\",\n  \"visaType\": \"TOURIST\",\n  \"processingTime\": \"3-5 business days\",\n  \"successRate\": 98,\n  \"isPublished\": true\n}"
+            },
+            "description": "Create a visa assistance service. Requires CREATOR role."
+          }
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"],
+              "variable": [
+                { "key": "id", "value": "product-uuid-here" }
+              ]
+            },
+            "description": "Fetch full details of a single product."
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"],
+              "variable": [
+                { "key": "id", "value": "product-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 2999,\n  \"description\": \"Updated product description.\",\n  \"isPublished\": true\n}"
+            },
+            "description": "Update your own product. Requires authentication and ownership."
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"],
+              "variable": [
+                { "key": "id", "value": "product-uuid-here" }
+              ]
+            },
+            "description": "Delete your own product. Requires authentication and ownership."
+          }
+        },
+        {
+          "name": "Get Product Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id/reviews?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id", "reviews"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ],
+              "variable": [
+                { "key": "id", "value": "product-uuid-here" }
+              ]
+            },
+            "description": "Paginated list of verified reviews for a product."
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Trips",
+      "description": "Collaborative trip planning — itineraries, days, items, and members.",
+      "item": [
+        {
+          "name": "My Trips",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "List all trips where the authenticated user is a member."
+          }
+        },
+        {
+          "name": "Create Trip",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Goa Beach Escape\",\n  \"description\": \"A relaxing week in Goa with friends.\",\n  \"destinationId\": \"destination-uuid-here\",\n  \"startDate\": \"2025-12-20\",\n  \"endDate\": \"2025-12-27\",\n  \"isPrivate\": false\n}"
+            },
+            "description": "Create a new trip. The authenticated user becomes the trip owner."
+          }
+        },
+        {
+          "name": "Get Trip Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" }
+              ]
+            },
+            "description": "Fetch full trip details including days, items, and members."
+          }
+        },
+        {
+          "name": "Update Trip",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Trip Title\",\n  \"isPrivate\": true\n}"
+            },
+            "description": "Update trip details. Requires trip ownership."
+          }
+        },
+        {
+          "name": "Delete Trip",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" }
+              ]
+            },
+            "description": "Permanently delete a trip. Requires trip ownership."
+          }
+        },
+        {
+          "name": "Invite Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "members"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-here\",\n  \"role\": \"EDITOR\"\n}"
+            },
+            "description": "Invite a user to collaborate on a trip. Role: OWNER | EDITOR | VIEWER."
+          }
+        },
+        {
+          "name": "Update Member Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/members/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "members", ":userId"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" },
+                { "key": "userId", "value": "user-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"VIEWER\"\n}"
+            },
+            "description": "Change a member's role on a trip. Requires trip ownership."
+          }
+        },
+        {
+          "name": "Remove Member",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/members/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "members", ":userId"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" },
+                { "key": "userId", "value": "user-uuid-here" }
+              ]
+            },
+            "description": "Remove a member from a trip. Requires trip ownership."
+          }
+        },
+        {
+          "name": "Add Day",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/days",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "days"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dayNumber\": 1,\n  \"date\": \"2025-12-20\",\n  \"title\": \"Arrival & Beach Evening\",\n  \"notes\": \"Check in, freshen up, sunset at Calangute beach.\",\n  \"destinationId\": \"destination-uuid-here\"\n}"
+            },
+            "description": "Add a new day to a trip itinerary."
+          }
+        },
+        {
+          "name": "Update Day",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/days/:dayId",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "days", ":dayId"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" },
+                { "key": "dayId", "value": "day-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Day Title\",\n  \"notes\": \"Updated notes for the day.\"\n}"
+            },
+            "description": "Update details for a trip day."
+          }
+        },
+        {
+          "name": "Delete Day",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/days/:dayId",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "days", ":dayId"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" },
+                { "key": "dayId", "value": "day-uuid-here" }
+              ]
+            },
+            "description": "Remove a day and all its items from a trip."
+          }
+        },
+        {
+          "name": "Add Item to Day",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/days/:dayId/items",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "days", ":dayId", "items"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" },
+                { "key": "dayId", "value": "day-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"ACTIVITY\",\n  \"title\": \"Scuba Diving at Grand Island\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"13:00\",\n  \"cost\": 3500,\n  \"productId\": \"product-uuid-here\",\n  \"notes\": \"Book in advance. Bring underwater camera.\"\n}"
+            },
+            "description": "Add an activity, stay, transport, or custom item to a trip day. Optionally link to a product."
+          }
+        },
+        {
+          "name": "Update Day Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/days/:dayId/items/:itemId",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "days", ":dayId", "items", ":itemId"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" },
+                { "key": "dayId", "value": "day-uuid-here" },
+                { "key": "itemId", "value": "item-uuid-here" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startTime\": \"10:00\",\n  \"cost\": 3000,\n  \"notes\": \"Updated notes.\"\n}"
+            },
+            "description": "Update a specific item within a trip day."
+          }
+        },
+        {
+          "name": "Delete Day Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/trips/:id/days/:dayId/items/:itemId",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", ":id", "days", ":dayId", "items", ":itemId"],
+              "variable": [
+                { "key": "id", "value": "trip-uuid-here" },
+                { "key": "dayId", "value": "day-uuid-here" },
+                { "key": "itemId", "value": "item-uuid-here" }
+              ]
+            },
+            "description": "Remove an item from a trip day."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Orders",
+      "description": "Order management for purchased products.",
+      "item": [
+        {
+          "name": "My Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "List all orders placed by the authenticated user."
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", ":id"],
+              "variable": [
+                { "key": "id", "value": "order-uuid-here" }
+              ]
+            },
+            "description": "Fetch full details of a single order including items and status."
+          }
+        },
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"product-uuid-here\",\n      \"quantity\": 2\n    },\n    {\n      \"productId\": \"another-product-uuid\",\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "description": "Place a new order. Returns payment initiation details."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Reviews",
+      "description": "Product reviews and ratings.",
+      "item": [
+        {
+          "name": "List Reviews for Product",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reviews?productId=product-uuid-here&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["reviews"],
+              "query": [
+                { "key": "productId", "value": "product-uuid-here", "description": "Required — filter by product UUID" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Public paginated list of reviews for a specific product."
+          }
+        },
+        {
+          "name": "Create Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviews",
+              "host": ["{{baseUrl}}"],
+              "path": ["reviews"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"product-uuid-here\",\n  \"rating\": 5,\n  \"title\": \"Absolutely incredible experience!\",\n  \"body\": \"The trek guide was knowledgeable, the sunrise was stunning. Highly recommend to anyone visiting McLeod Ganj.\"\n}"
+            },
+            "description": "Submit a review for a product you have purchased. Rating: 1–5. Requires authentication."
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Subscriptions",
+      "description": "Creator subscription plans and user subscriptions.",
+      "item": [
+        {
+          "name": "List Plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions", "plans"]
+            },
+            "description": "Public list of all available subscription plans."
+          }
+        },
+        {
+          "name": "My Active Subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/my",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions", "my"]
+            },
+            "description": "List all active subscriptions of the authenticated user."
+          }
+        },
+        {
+          "name": "Subscribe",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"plan-uuid-here\",\n  \"creatorId\": \"creator-uuid-here\"\n}"
+            },
+            "description": "Subscribe to a plan or a specific creator. Requires authentication."
+          }
+        },
+        {
+          "name": "Cancel Subscription",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions", ":id"],
+              "variable": [
+                { "key": "id", "value": "subscription-uuid-here" }
+              ]
+            },
+            "description": "Cancel an active subscription. Access is typically retained until the billing period ends."
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Media",
+      "description": "File upload and management.",
+      "item": [
+        {
+          "name": "Upload File",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/media/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["media", "upload"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "description": "The file to upload (image, video, PDF, etc.)"
+                }
+              ]
+            },
+            "description": "Upload a file via multipart/form-data. Returns the uploaded file's URL and metadata. Requires authentication."
+          }
+        },
+        {
+          "name": "Delete File",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/media/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["media", ":id"],
+              "variable": [
+                { "key": "id", "value": "media-uuid-here" }
+              ]
+            },
+            "description": "Delete an uploaded file by its ID. Requires ownership."
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Notifications",
+      "description": "In-app notification management.",
+      "item": [
+        {
+          "name": "My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Paginated list of the authenticated user's notifications."
+          }
+        },
+        {
+          "name": "Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/unread-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "unread-count"]
+            },
+            "description": "Get the count of unread notifications for the authenticated user."
+          }
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/:id/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", ":id", "read"],
+              "variable": [
+                { "key": "id", "value": "notification-uuid-here" }
+              ]
+            },
+            "description": "Mark a single notification as read."
+          }
+        },
+        {
+          "name": "Mark All Notifications Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "read-all"]
+            },
+            "description": "Mark every unread notification as read in a single call."
+          }
+        }
+      ]
+    }
+  ]
+}
