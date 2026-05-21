@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Param,
   UseGuards,
   Req,
   Res,
@@ -19,6 +20,7 @@ import {
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
+import { RegisterCreatorDto } from './dto/register-creator.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -45,6 +47,22 @@ export class AuthController {
   @ApiResponse({ status: 409, description: 'Email already exists' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Public()
+  @Post('register/creator')
+  @ApiOperation({ summary: 'Register as a creator using an admin-issued invite token' })
+  @ApiResponse({ status: 201, description: 'Creator account created' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired invite token' })
+  async registerCreator(@Body() dto: RegisterCreatorDto) {
+    return this.authService.registerCreator(dto);
+  }
+
+  @Public()
+  @Get('invites/:token/validate')
+  @ApiOperation({ summary: 'Validate a creator invite token (returns email if valid)' })
+  async validateInvite(@Param('token') token: string) {
+    return this.authService.validateInviteToken(token);
   }
 
   @Public()

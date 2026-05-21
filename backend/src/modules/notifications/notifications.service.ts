@@ -12,10 +12,10 @@ export class NotificationsService {
     private readonly notificationRepository: Repository<Notification>,
   ) {}
 
-  async findAll(userId: string, pagination: PaginationDto) {
+  async findAll(recipientId: string, pagination: PaginationDto) {
     const { page = 1, limit = 20 } = pagination;
     const [data, total] = await this.notificationRepository.findAndCount({
-      where: { userId },
+      where: { recipientId },
       order: { createdAt: 'DESC' },
       take: limit,
       skip: (page - 1) * limit,
@@ -23,25 +23,45 @@ export class NotificationsService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
-  async getUnreadCount(userId: string) {
+  async getUnreadCount(recipientId: string) {
     const count = await this.notificationRepository.count({
-      where: { userId, isRead: false },
+      where: { recipientId, isRead: false },
     });
     return { count };
   }
 
-  async markRead(id: string, userId: string) {
-    await this.notificationRepository.update({ id, userId }, { isRead: true, readAt: new Date() });
+  async markRead(id: string, recipientId: string) {
+    await this.notificationRepository.update(
+      { id, recipientId },
+      { isRead: true, readAt: new Date() },
+    );
     return { success: true };
   }
 
-  async markAllRead(userId: string) {
-    await this.notificationRepository.update({ userId, isRead: false }, { isRead: true, readAt: new Date() });
+  async markAllRead(recipientId: string) {
+    await this.notificationRepository.update(
+      { recipientId, isRead: false },
+      { isRead: true, readAt: new Date() },
+    );
     return { success: true };
   }
 
-  async create(userId: string, type: NotificationType, title: string, body: string, data?: Record<string, any>) {
-    const notification = this.notificationRepository.create({ userId, type, title, body, data });
+  async create(
+    recipientId: string,
+    type: NotificationType,
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+    senderId?: string,
+  ) {
+    const notification = this.notificationRepository.create({
+      recipientId,
+      type,
+      title,
+      body,
+      data,
+      senderId,
+    });
     return this.notificationRepository.save(notification);
   }
 }

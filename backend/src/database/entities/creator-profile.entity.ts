@@ -22,9 +22,12 @@ export class CreatorProfile {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   @Index({ unique: true })
   slug: string;
+
+  @Column({ default: false })
+  isOnboardingComplete: boolean;
 
   @Column({ nullable: true })
   displayName: string;

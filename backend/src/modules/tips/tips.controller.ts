@@ -10,7 +10,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
-import { UserRole } from '../../common/enums';
+import { UserRole, TipCategory } from '../../common/enums';
 import { User } from '../../database/entities/user.entity';
 
 @ApiTags('tips')
@@ -29,21 +29,25 @@ export class TipsController {
     @Query('category') category?: string,
     @Query('creatorId') creatorId?: string,
   ) {
-    return this.tipsService.findAll(pagination, { destinationId, category, creatorId });
+    return this.tipsService.findAll(pagination, {
+      destinationId,
+      category: category as TipCategory | undefined,
+      creatorId,
+    });
   }
 
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Get tip by ID' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.tipsService.findOne(id);
+    return this.tipsService.findById(id);
   }
 
   @Post()
   @Roles(UserRole.CREATOR)
   @ApiOperation({ summary: 'Create travel tip (creator only)' })
   create(@Body() dto: CreateTipDto, @CurrentUser() user: User) {
-    return this.tipsService.create(dto, user.id);
+    return this.tipsService.create(user.id, dto);
   }
 
   @Patch(':id')
@@ -54,7 +58,7 @@ export class TipsController {
     @Body() dto: Partial<CreateTipDto>,
     @CurrentUser() user: User,
   ) {
-    return this.tipsService.update(id, dto, user.id);
+    return this.tipsService.update(id, user.id, dto);
   }
 
   @Delete(':id')
@@ -67,6 +71,6 @@ export class TipsController {
   @Post(':id/like')
   @ApiOperation({ summary: 'Like a tip' })
   like(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
-    return this.tipsService.toggleLike(id, user.id);
+    return this.tipsService.likeTip(id, user.id);
   }
 }
