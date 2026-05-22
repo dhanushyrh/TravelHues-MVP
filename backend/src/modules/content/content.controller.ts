@@ -9,6 +9,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -28,8 +29,11 @@ import { User } from '../../database/entities/user.entity';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { ParseUuidPipe } from '../../common/pipes/parse-uuid.pipe';
 
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 @ApiTags('Content')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('content')
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
