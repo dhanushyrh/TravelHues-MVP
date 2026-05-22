@@ -21,6 +21,7 @@ export const adminDestinationsApi = {
     search?: string;
     page?: number;
     limit?: number;
+    includeInactive?: string;
   }) => api.get('/admin/destinations', { params }),
 
   tree: () => api.get('/admin/destinations/tree'),

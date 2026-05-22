@@ -84,7 +84,7 @@ export class ProductsService {
         ...itineraryMeta,
         productId: savedProduct.id,
       });
-      const savedItinerary = await this.itineraryRepository.save(itinerary);
+      const savedItinerary = await this.itineraryRepository.save(itinerary) as any;
 
       if (days?.length) {
         const dayEntities = (days as any[]).map((day: any, idx: number) =>
@@ -94,7 +94,7 @@ export class ProductsService {
             itineraryId: savedItinerary.id,
           }),
         );
-        await this.itineraryDayRepository.save(dayEntities);
+        await this.itineraryDayRepository.save(dayEntities as any);
       }
     } else if (dto.type === ProductType.FOOD && foodPlaceDetails) {
       const foodPlace = this.foodPlaceRepository.create({ ...foodPlaceDetails, productId: savedProduct.id });

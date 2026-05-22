@@ -385,7 +385,7 @@ export class AdminService {
   async updateCreatorTier(id: string, tier: CreatorTier): Promise<CreatorProfile> {
     const creator = await this.creatorRepository.findOne({ where: { id } });
     if (!creator) throw new NotFoundException('Creator not found');
-    creator.creatorTier = tier;
+    creator.tier = tier;
     return this.creatorRepository.save(creator);
   }
 

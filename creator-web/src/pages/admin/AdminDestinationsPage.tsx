@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, X } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,19 +47,10 @@ interface Destination {
   createdAt: string;
 }
 
-interface DestinationListResponse {
-  data: Destination[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-  };
-}
-
 // ── Zod schema ────────────────────────────────────────────────────────────────
 const destinationSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  type: z.enum(['country', 'city', 'region'], { required_error: 'Type is required' }),
+  type: z.enum(['country', 'city'], { required_error: 'Type is required' }),
   parentId: z.string().optional(),
   continent: z.string().optional(),
   countryCode: z.string().optional(),
@@ -70,6 +61,8 @@ const destinationSchema = z.object({
 });
 
 type DestinationFormValues = z.infer<typeof destinationSchema>;
+
+type ActiveFilter = 'all' | 'active' | 'inactive';
 
 // ── Toggle switch ─────────────────────────────────────────────────────────────
 function ToggleSwitch({ isActive, onClick }: { isActive: boolean; onClick: () => void }) {
@@ -96,13 +89,11 @@ function ToggleSwitch({ isActive, onClick }: { isActive: boolean; onClick: () =>
 function DestinationForm({
   defaultValues,
   countries,
-  cities,
   onSubmit,
   isSubmitting,
 }: {
   defaultValues?: Partial<DestinationFormValues>;
   countries: Destination[];
-  cities: Destination[];
   onSubmit: (data: DestinationFormValues) => void;
   isSubmitting: boolean;
 }) {
@@ -143,7 +134,6 @@ function DestinationForm({
               <SelectContent>
                 <SelectItem value="country">Country</SelectItem>
                 <SelectItem value="city">City</SelectItem>
-                <SelectItem value="region">Region</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -175,43 +165,17 @@ function DestinationForm({
         </div>
       )}
 
-      {selectedType === 'region' && (
-        <div>
-          <Label>Parent City</Label>
-          <Controller
-            name="parentId"
-            control={control}
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select city" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cities.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-      )}
-
       {selectedType === 'country' && (
-        <>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="continent">Continent</Label>
-              <Input id="continent" {...register('continent')} className="mt-1" placeholder="Asia" />
-            </div>
-            <div>
-              <Label htmlFor="countryCode">Country Code</Label>
-              <Input id="countryCode" {...register('countryCode')} className="mt-1" placeholder="IN" />
-            </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="continent">Continent</Label>
+            <Input id="continent" {...register('continent')} className="mt-1" placeholder="Asia" />
           </div>
-        </>
+          <div>
+            <Label htmlFor="countryCode">Country Code</Label>
+            <Input id="countryCode" {...register('countryCode')} className="mt-1" placeholder="IN" />
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">
@@ -267,10 +231,7 @@ function DestinationRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const parentName =
-    destination.parent?.name ??
-    destination.parentName ??
-    '—';
+  const parentName = destination.parent?.name ?? destination.parentName ?? '—';
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -278,6 +239,16 @@ function DestinationRow({
         <p className="text-sm font-semibold text-gray-900 truncate">{destination.name}</p>
         <p className="text-xs text-gray-400 mt-0.5">{parentName}</p>
       </div>
+      <span
+        className={cn(
+          'text-xs px-2 py-0.5 rounded-full font-medium',
+          destination.isActive
+            ? 'bg-green-50 text-green-700'
+            : 'bg-gray-100 text-gray-500'
+        )}
+      >
+        {destination.isActive ? 'Active' : 'Inactive'}
+      </span>
       <div className="flex items-center gap-3 flex-shrink-0">
         <ToggleSwitch isActive={destination.isActive} onClick={onToggle} />
         <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 w-8 p-0">
@@ -300,27 +271,36 @@ function DestinationRow({
 function DestinationTabPanel({
   type,
   search,
+  activeFilter,
   countries,
-  cities,
   onEditDestination,
 }: {
-  type: 'country' | 'city' | 'region';
+  type: 'country' | 'city';
   search: string;
+  activeFilter: ActiveFilter;
   countries: Destination[];
-  cities: Destination[];
   onEditDestination: (dest: Destination) => void;
 }) {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'destinations', type, search],
+    queryKey: ['admin', 'destinations', type, search, activeFilter],
     queryFn: () =>
-      adminDestinationsApi.list({ type, search: search || undefined, limit: 100 }),
+      adminDestinationsApi.list({
+        type,
+        search: search || undefined,
+        limit: 100,
+        ...(activeFilter !== 'all' ? { includeInactive: activeFilter === 'inactive' ? 'true' : 'false' } : { includeInactive: 'true' }),
+      }),
     select: (res) => {
       const d = res.data?.data ?? res.data;
-      if (Array.isArray(d)) return d as Destination[];
-      if (Array.isArray(d?.data)) return d.data as Destination[];
-      return [] as Destination[];
+      let list: Destination[] = [];
+      if (Array.isArray(d)) list = d as Destination[];
+      else if (Array.isArray(d?.data)) list = d.data as Destination[];
+
+      if (activeFilter === 'active') return list.filter((x) => x.isActive);
+      if (activeFilter === 'inactive') return list.filter((x) => !x.isActive);
+      return list;
     },
   });
 
@@ -361,7 +341,9 @@ function DestinationTabPanel({
   if (!data || data.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400 text-sm">
-        No {type}s found{search ? ` matching "${search}"` : ''}.
+        No {type === 'country' ? 'countries' : 'cities'} found
+        {search ? ` matching "${search}"` : ''}
+        {activeFilter !== 'all' ? ` (${activeFilter} only)` : ''}.
       </div>
     );
   }
@@ -384,27 +366,22 @@ function DestinationTabPanel({
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminDestinationsPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'country' | 'city' | 'region'>('country');
+  const [activeTab, setActiveTab] = useState<'country' | 'city'>('country');
   const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Destination | null>(null);
 
-  // Fetch all countries (for parent selects)
-  const { data: countries = [] } = useQuery({
-    queryKey: ['admin', 'destinations', 'country', ''],
-    queryFn: () => adminDestinationsApi.list({ type: 'country', limit: 500 }),
-    select: (res) => {
-      const d = res.data?.data ?? res.data;
-      if (Array.isArray(d)) return d as Destination[];
-      if (Array.isArray(d?.data)) return d.data as Destination[];
-      return [] as Destination[];
-    },
-  });
+  const handleTabChange = (v: string) => {
+    setActiveTab(v as 'country' | 'city');
+    setSearch('');
+    setActiveFilter('all');
+  };
 
-  // Fetch all cities (for parent selects)
-  const { data: cities = [] } = useQuery({
-    queryKey: ['admin', 'destinations', 'city', ''],
-    queryFn: () => adminDestinationsApi.list({ type: 'city', limit: 500 }),
+  // Fetch all countries (for parent selects in city form)
+  const { data: countries = [] } = useQuery({
+    queryKey: ['admin', 'destinations', 'country', '', 'all'],
+    queryFn: () => adminDestinationsApi.list({ type: 'country', limit: 500, includeInactive: 'true' }),
     select: (res) => {
       const d = res.data?.data ?? res.data;
       if (Array.isArray(d)) return d as Destination[];
@@ -434,14 +411,7 @@ export default function AdminDestinationsPage() {
     onError: () => toast.error('Failed to update destination'),
   });
 
-  const handleCreate = (data: DestinationFormValues) => {
-    createMutation.mutate(data);
-  };
-
-  const handleUpdate = (data: DestinationFormValues) => {
-    if (!editTarget) return;
-    updateMutation.mutate({ id: editTarget.id, data });
-  };
+  const hasFilters = search || activeFilter !== 'all';
 
   return (
     <AdminLayout>
@@ -450,7 +420,7 @@ export default function AdminDestinationsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Destinations</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Manage countries, cities, and regions.</p>
+            <p className="text-gray-500 text-sm mt-0.5">Manage countries and cities.</p>
           </div>
           <Button onClick={() => setIsAddOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
@@ -458,32 +428,56 @@ export default function AdminDestinationsPage() {
           </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search destinations..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+        {/* Search + Filter row */}
+        <div className="flex gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder={`Search ${activeTab === 'country' ? 'countries' : 'cities'}...`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as ActiveFilter)}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="active">Active only</SelectItem>
+              <SelectItem value="inactive">Inactive only</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setSearch(''); setActiveFilter('all'); }}
+              className="text-gray-500 hover:text-gray-700 px-2"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Clear
+            </Button>
+          )}
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList>
             <TabsTrigger value="country">Countries</TabsTrigger>
             <TabsTrigger value="city">Cities</TabsTrigger>
-            <TabsTrigger value="region">Regions</TabsTrigger>
           </TabsList>
 
-          {(['country', 'city', 'region'] as const).map((type) => (
+          {(['country', 'city'] as const).map((type) => (
             <TabsContent key={type} value={type}>
               <DestinationTabPanel
                 type={type}
                 search={search}
+                activeFilter={activeFilter}
                 countries={countries}
-                cities={cities}
                 onEditDestination={setEditTarget}
               />
             </TabsContent>
@@ -499,8 +493,7 @@ export default function AdminDestinationsPage() {
           </DialogHeader>
           <DestinationForm
             countries={countries}
-            cities={cities}
-            onSubmit={handleCreate}
+            onSubmit={(data) => createMutation.mutate(data)}
             isSubmitting={createMutation.isPending}
           />
         </DialogContent>
@@ -516,7 +509,7 @@ export default function AdminDestinationsPage() {
             <DestinationForm
               defaultValues={{
                 name: editTarget.name,
-                type: editTarget.type,
+                type: editTarget.type as 'country' | 'city',
                 parentId: editTarget.parentId,
                 continent: editTarget.continent,
                 countryCode: editTarget.countryCode,
@@ -526,8 +519,7 @@ export default function AdminDestinationsPage() {
                 description: editTarget.description,
               }}
               countries={countries}
-              cities={cities}
-              onSubmit={handleUpdate}
+              onSubmit={(data) => updateMutation.mutate({ id: editTarget.id, data })}
               isSubmitting={updateMutation.isPending}
             />
           )}
