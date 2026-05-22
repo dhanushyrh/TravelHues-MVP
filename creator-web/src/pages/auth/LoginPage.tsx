@@ -41,7 +41,11 @@ export default function LoginPage() {
       const { user, accessToken, refreshToken } = result;
       setAuth(user, accessToken, refreshToken);
       toast.success(`Welcome back, ${user.firstName}!`);
-      navigate({ to: '/dashboard' });
+      if (user.role === 'admin') {
+        navigate({ to: '/admin' });
+      } else {
+        navigate({ to: '/dashboard' });
+      }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       const message = err?.response?.data?.message || 'Invalid email or password';

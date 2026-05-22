@@ -49,9 +49,9 @@ const loginRoute = createRoute({
   path: '/auth/login',
   component: LoginPage,
   beforeLoad: () => {
-    const { isAuthenticated } = useAuthStore.getState();
+    const { isAuthenticated, user } = useAuthStore.getState();
     if (isAuthenticated) {
-      throw redirect({ to: '/dashboard' });
+      throw redirect({ to: user?.role === 'admin' ? '/admin' : '/dashboard' });
     }
   },
 });

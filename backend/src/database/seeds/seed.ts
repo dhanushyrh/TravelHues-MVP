@@ -148,6 +148,7 @@ async function seedAdminUser() {
       lastName: 'Admin',
       role: 'admin',
       isEmailVerified: true,
+      isActive: true,
     }),
   );
   console.log(`  ✓ ${email}  (password: Admin@123)`);
