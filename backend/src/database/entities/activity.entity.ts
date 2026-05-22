@@ -69,6 +69,21 @@ export class Activity {
   @Column({ nullable: true })
   osmId: string;
 
+  @Column({ nullable: true })
+  subCategory: string;
+
+  @Column({ type: 'simple-array', nullable: true })
+  seasonality: string[];
+
+  @Column({ nullable: true })
+  ageGroup: string;
+
+  @Column({ nullable: true })
+  affiliateLink: string;
+
+  @Column({ nullable: true })
+  estimatedCost: string;
+
   // Relations
   @OneToOne(() => Product, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'productId' })
