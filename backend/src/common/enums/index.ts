@@ -109,3 +109,13 @@ export enum InviteStatus {
   REVOKED = 'revoked',
   EXPIRED = 'expired',
 }
+
+export enum StoryStatus {
+  DRAFT = 'draft',
+  PUBLISHED = 'published',
+}
+
+export enum ContentEmbedType {
+  YOUTUBE = 'youtube',
+  INSTAGRAM = 'instagram',
+}
