@@ -9,6 +9,7 @@ import {
   LogOut,
   ChevronDown,
   Shield,
+  BookOpen,
 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { useAuthStore } from '@/store/auth.store';
@@ -25,6 +26,7 @@ import {
 
 const navLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/stories', label: 'Stories', icon: BookOpen },
   { to: '/content', label: 'Content', icon: Video },
   { to: '/products', label: 'Products', icon: Package },
   { to: '/storefront', label: 'Storefront', icon: Store },

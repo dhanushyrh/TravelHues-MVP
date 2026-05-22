@@ -23,6 +23,7 @@ import { MediaModule } from './modules/media/media.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { StoriesModule } from './modules/stories/stories.module';
 
 @Module({
   controllers: [AppController],
@@ -82,6 +83,7 @@ import { AdminModule } from './modules/admin/admin.module';
     NotificationsModule,
     ReviewsModule,
     AdminModule,
+    StoriesModule,
   ],
 })
 export class AppModule {}

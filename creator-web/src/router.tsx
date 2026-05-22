@@ -23,6 +23,9 @@ import AdminPlansPage from '@/pages/admin/AdminPlansPage';
 import AdminInvitesPage from '@/pages/admin/AdminInvitesPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 import AdminCreatorsPage from '@/pages/admin/AdminCreatorsPage';
+import StoriesPage from '@/pages/stories/StoriesPage';
+import StoryCreatePage from '@/pages/stories/StoryCreatePage';
+import StoryDetailPage from '@/pages/stories/StoryDetailPage';
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function requireAuth() {
@@ -132,6 +135,28 @@ const settingsRoute = createRoute({
   beforeLoad: requireAuth,
 });
 
+// ── Stories routes ────────────────────────────────────────────────────────────
+const storiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/stories',
+  component: StoriesPage,
+  beforeLoad: requireAuth,
+});
+
+const storyNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/stories/new',
+  component: StoryCreatePage,
+  beforeLoad: requireAuth,
+});
+
+const storyDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/stories/$storyId',
+  component: StoryDetailPage,
+  beforeLoad: requireAuth,
+});
+
 // ── Admin routes ──────────────────────────────────────────────────────────────
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -188,6 +213,9 @@ const routeTree = rootRoute.addChildren([
   newProductRoute,
   storefrontRoute,
   settingsRoute,
+  storiesRoute,
+  storyNewRoute,
+  storyDetailRoute,
   adminRoute,
   adminDestinationsRoute,
   adminPlansRoute,

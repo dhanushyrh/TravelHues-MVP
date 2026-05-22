@@ -141,3 +141,41 @@ export interface MediaUploadResponse {
   mimetype: string;
   size: number;
 }
+
+export interface Destination {
+  id: string;
+  name: string;
+  slug: string;
+  type: 'country' | 'city' | 'region';
+  coverImageUrl?: string;
+  flagImageUrl?: string;
+  continent?: string;
+  countryCode?: string;
+  isActive: boolean;
+}
+
+export interface Tip {
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+  isPublished: boolean;
+  createdAt: string;
+}
+
+export interface Story {
+  id: string;
+  title: string;
+  description?: string;
+  coverImageUrl?: string;
+  status: 'draft' | 'published';
+  isPublished: boolean;
+  countryId: string;
+  country?: Destination;
+  viewCount: number;
+  products?: Product[];
+  tips?: Tip[];
+  content?: Content[];
+  createdAt: string;
+  updatedAt: string;
+}

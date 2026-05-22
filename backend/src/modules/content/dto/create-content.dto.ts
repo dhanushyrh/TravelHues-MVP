@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ContentType } from '../../../common/enums';
+import { ContentType, ContentEmbedType } from '../../../common/enums';
 
 export class CreateContentDto {
   @ApiProperty({ example: 'Hidden Gems in Bali' })
@@ -70,4 +70,14 @@ export class CreateContentDto {
   @Type(() => Number)
   @IsNumber()
   duration?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  embedUrl?: string;
+
+  @ApiPropertyOptional({ enum: ContentEmbedType })
+  @IsOptional()
+  @IsEnum(ContentEmbedType)
+  embedType?: ContentEmbedType;
 }

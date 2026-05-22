@@ -11,7 +11,7 @@ import {
   JoinTable,
   Index,
 } from 'typeorm';
-import { ContentType } from '../../common/enums';
+import { ContentType, ContentEmbedType } from '../../common/enums';
 import { CreatorProfile } from './creator-profile.entity';
 import { Destination } from './destination.entity';
 import { ContentLike } from './content-like.entity';
@@ -73,6 +73,12 @@ export class Content {
 
   @Column({ nullable: true })
   location: string;
+
+  @Column({ nullable: true })
+  embedUrl: string;
+
+  @Column({ type: 'enum', enum: ContentEmbedType, nullable: true })
+  embedType: ContentEmbedType;
 
   @CreateDateColumn()
   createdAt: Date;
