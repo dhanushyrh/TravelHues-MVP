@@ -9,6 +9,7 @@ import {
   IsPositive,
   MaxLength,
   ValidateNested,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -48,6 +49,15 @@ export class ActivityDetailsDto {
   @IsOptional()
   @IsBoolean()
   isInstantBooking?: boolean;
+
+  @IsOptional() @IsString() address?: string;
+  @IsOptional() @IsNumber() latitude?: number;
+  @IsOptional() @IsNumber() longitude?: number;
+  @IsOptional() @IsString() website?: string;
+  @IsOptional() @IsString() phoneNumber?: string;
+  @IsOptional() @IsObject() openingHours?: Record<string, string>;
+  @IsOptional() @IsString() priceRange?: string;
+  @IsOptional() @IsString() osmId?: string;
 }
 
 export class StayDetailsDto {
@@ -80,6 +90,14 @@ export class StayDetailsDto {
   @IsNumber()
   @IsPositive()
   pricePerNight?: number;
+
+  @IsOptional() @IsNumber() latitude?: number;
+  @IsOptional() @IsNumber() longitude?: number;
+  @IsOptional() @IsString() website?: string;
+  @IsOptional() @IsString() phoneNumber?: string;
+  @IsOptional() @IsObject() openingHours?: Record<string, string>;
+  @IsOptional() @IsString() priceRange?: string;
+  @IsOptional() @IsString() osmId?: string;
 }
 
 export class ItineraryActivityDto {
@@ -135,6 +153,22 @@ export class ItineraryDetailsDto {
   @ValidateNested({ each: true })
   @Type(() => ItineraryDayDto)
   days?: ItineraryDayDto[];
+}
+
+export class FoodPlaceDetailsDto {
+  @IsOptional() @IsString() address?: string;
+  @IsOptional() @IsNumber() latitude?: number;
+  @IsOptional() @IsNumber() longitude?: number;
+  @IsOptional() @IsString() cuisine?: string;
+  @IsOptional() @IsString() priceRange?: string;
+  @IsOptional() @IsString() website?: string;
+  @IsOptional() @IsString() phoneNumber?: string;
+  @IsOptional() @IsObject() openingHours?: Record<string, string>;
+  @IsOptional() @IsArray() @IsString({ each: true }) features?: string[];
+  @IsOptional() @IsBoolean() hasDineIn?: boolean;
+  @IsOptional() @IsBoolean() hasTakeaway?: boolean;
+  @IsOptional() @IsBoolean() hasDelivery?: boolean;
+  @IsOptional() @IsString() osmId?: string;
 }
 
 export class CreateProductDto {
@@ -207,4 +241,10 @@ export class CreateProductDto {
   @ValidateNested()
   @Type(() => ItineraryDetailsDto)
   itineraryDetails?: ItineraryDetailsDto;
+
+  @ApiPropertyOptional({ description: 'Food place details' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FoodPlaceDetailsDto)
+  foodPlaceDetails?: FoodPlaceDetailsDto;
 }

@@ -13,6 +13,7 @@ import { ItineraryDay } from '../../database/entities/itinerary-day.entity';
 import { Review } from '../../database/entities/review.entity';
 import { CreatorProfile } from '../../database/entities/creator-profile.entity';
 import { Tag } from '../../database/entities/tag.entity';
+import { FoodPlace } from '../../database/entities/food-place.entity';
 import { ProductType } from '../../common/enums';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -38,6 +39,8 @@ export class ProductsService {
     private readonly tagRepository: Repository<Tag>,
     @InjectRepository(ItineraryDay)
     private readonly itineraryDayRepository: Repository<ItineraryDay>,
+    @InjectRepository(FoodPlace)
+    private readonly foodPlaceRepository: Repository<FoodPlace>,
   ) {}
 
   async create(userId: string, dto: CreateProductDto): Promise<Product> {
@@ -51,7 +54,7 @@ export class ProductsService {
       tags = await this.tagRepository.findByIds(dto.tagIds);
     }
 
-    const { activityDetails, stayDetails, itineraryDetails, tagIds, ...productData } = dto;
+    const { activityDetails, stayDetails, itineraryDetails, foodPlaceDetails, tagIds, ...productData } = dto;
 
     const product = this.productRepository.create({
       ...productData,
@@ -93,6 +96,9 @@ export class ProductsService {
         );
         await this.itineraryDayRepository.save(dayEntities);
       }
+    } else if (dto.type === ProductType.FOOD && foodPlaceDetails) {
+      const foodPlace = this.foodPlaceRepository.create({ ...foodPlaceDetails, productId: savedProduct.id });
+      await this.foodPlaceRepository.save(foodPlace);
     }
 
     if (dto.isPublished) {
@@ -186,7 +192,7 @@ export class ProductsService {
       await this.creatorRepository.increment({ id: creator.id }, 'totalProducts', 1);
     }
 
-    const { tagIds, activityDetails, stayDetails, itineraryDetails, ...updateData } = dto as any;
+    const { tagIds, activityDetails, stayDetails, itineraryDetails, foodPlaceDetails, ...updateData } = dto as any;
     Object.assign(product, updateData);
     return this.productRepository.save(product);
   }

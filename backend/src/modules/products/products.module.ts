@@ -10,6 +10,7 @@ import { ItineraryDay } from '../../database/entities/itinerary-day.entity';
 import { Review } from '../../database/entities/review.entity';
 import { CreatorProfile } from '../../database/entities/creator-profile.entity';
 import { Tag } from '../../database/entities/tag.entity';
+import { FoodPlace } from '../../database/entities/food-place.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Tag } from '../../database/entities/tag.entity';
       Review,
       CreatorProfile,
       Tag,
+      FoodPlace,
     ]),
   ],
   controllers: [ProductsController],

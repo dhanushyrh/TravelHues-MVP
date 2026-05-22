@@ -11,6 +11,7 @@ export enum ProductType {
   PACKAGE = 'package',
   VISA_SERVICE = 'visa_service',
   DIGITAL_DOWNLOAD = 'digital_download',
+  FOOD = 'food',
 }
 
 export enum ContentType {

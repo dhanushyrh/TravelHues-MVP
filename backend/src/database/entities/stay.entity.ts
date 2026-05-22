@@ -54,6 +54,21 @@ export class Stay {
   @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
   longitude: number;
 
+  @Column({ nullable: true })
+  website: string;
+
+  @Column({ nullable: true })
+  phoneNumber: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  openingHours: Record<string, string>;
+
+  @Column({ nullable: true })
+  priceRange: string;
+
+  @Column({ nullable: true })
+  osmId: string;
+
   @Column({ type: 'jsonb', nullable: true })
   availability: Record<string, any>;
 

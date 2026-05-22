@@ -45,6 +45,30 @@ export class Activity {
   @Column({ default: true })
   isInstantBooking: boolean;
 
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  latitude: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  longitude: number;
+
+  @Column({ nullable: true })
+  address: string;
+
+  @Column({ nullable: true })
+  website: string;
+
+  @Column({ nullable: true })
+  phoneNumber: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  openingHours: Record<string, string>;
+
+  @Column({ nullable: true })
+  priceRange: string;
+
+  @Column({ nullable: true })
+  osmId: string;
+
   // Relations
   @OneToOne(() => Product, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'productId' })

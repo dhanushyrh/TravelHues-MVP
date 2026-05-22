@@ -14,6 +14,7 @@ import {
   Globe2,
   Upload,
   X,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -29,15 +30,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { productsApi } from '@/api/products.api';
-import { mediaApi } from '@/api/media.api';
+import { LocationSearch, type LocationValue } from '@/components/ui/LocationSearch';
+import { OpeningHoursEditor } from '@/components/ui/OpeningHoursEditor';
 import {
   ItineraryBuilder,
   type ItineraryDetailsValue,
 } from '@/components/products/ItineraryBuilder';
+import { productsApi } from '@/api/products.api';
+import { mediaApi } from '@/api/media.api';
 
 // ── Product types ─────────────────────────────────────────────────────────────
-type ProductType = 'activity' | 'stay' | 'itinerary' | 'package' | 'visa';
+type ProductType = 'activity' | 'stay' | 'itinerary' | 'package' | 'visa' | 'food';
 
 const PRODUCT_TYPES = [
   {
@@ -65,6 +68,14 @@ const PRODUCT_TYPES = [
     iconClass: 'text-purple-500',
   },
   {
+    id: 'food' as ProductType,
+    label: 'Food Place',
+    desc: 'Restaurants, cafes, and food experiences',
+    icon: UtensilsCrossed,
+    colorClass: 'border-rose-200 hover:border-rose-400 hover:bg-rose-50',
+    iconClass: 'text-rose-500',
+  },
+  {
     id: 'package' as ProductType,
     label: 'Package',
     desc: 'All-inclusive travel bundles',
@@ -82,7 +93,7 @@ const PRODUCT_TYPES = [
   },
 ];
 
-// ── Unified form schema (all fields, required ones vary by type) ───────────────
+// ── Form schema ───────────────────────────────────────────────────────────────
 const productFormSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
@@ -92,11 +103,15 @@ const productFormSchema = z.object({
   difficulty: z.string().optional(),
   groupSize: z.coerce.number().optional(),
   meetingPoint: z.string().optional(),
+  website: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  priceRange: z.string().optional(),
   // Stay
   propertyType: z.string().optional(),
   starRating: z.coerce.number().optional(),
-  address: z.string().optional(),
-  // Package (uses duration, groupSize from above)
+  // Food
+  cuisine: z.string().optional(),
+  // Package
   // Visa
   fromCountry: z.string().optional(),
   toCountry: z.string().optional(),
@@ -107,7 +122,70 @@ const productFormSchema = z.object({
 
 type ProductFormData = z.infer<typeof productFormSchema>;
 
-// ── ProductForm component ─────────────────────────────────────────────────────
+// ── Tag chip helper ───────────────────────────────────────────────────────────
+function TagChips({
+  tags,
+  input,
+  onInputChange,
+  onAdd,
+  onRemove,
+  placeholder,
+}: {
+  tags: string[];
+  input: string;
+  onInputChange: (v: string) => void;
+  onAdd: (v: string) => void;
+  onRemove: (v: string) => void;
+  placeholder: string;
+}) {
+  const commit = () => {
+    const v = input.trim();
+    if (v && !tags.includes(v)) onAdd(v);
+    onInputChange('');
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input
+          placeholder={placeholder}
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+        />
+        <Button type="button" variant="outline" size="sm" onClick={commit}>Add</Button>
+      </div>
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {tags.map((t) => (
+            <span key={t} className="flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-full text-xs text-gray-700 cursor-pointer" onClick={() => onRemove(t)}>
+              {t}<X className="w-3 h-3" />
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Toggle pill ───────────────────────────────────────────────────────────────
+function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+        value ? 'bg-[#E8342A]/10 border-[#E8342A]/40 text-[#E8342A]' : 'bg-gray-50 border-gray-200 text-gray-500'
+      }`}
+    >
+      <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${value ? 'border-[#E8342A] bg-[#E8342A]' : 'border-gray-300'}`}>
+        {value && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+      </span>
+      {label}
+    </button>
+  );
+}
+
+// ── ProductForm ───────────────────────────────────────────────────────────────
 function ProductForm({ type }: { type: ProductType }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -116,19 +194,29 @@ function ProductForm({ type }: { type: ProductType }) {
   const [isDragging, setIsDragging] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Activity / Stay / Food — shared location & hours
+  const [activityLocation, setActivityLocation] = useState<LocationValue | null>(null);
+  const [activityHours, setActivityHours] = useState<Record<string, string>>({});
   const [amenities, setAmenities] = useState<string[]>([]);
   const [amenityInput, setAmenityInput] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [stayLocation, setStayLocation] = useState<LocationValue | null>(null);
+  const [stayHours, setStayHours] = useState<Record<string, string>>({});
+  const [foodLocation, setFoodLocation] = useState<LocationValue | null>(null);
+  const [foodHours, setFoodHours] = useState<Record<string, string>>({});
+  const [foodFeatures, setFoodFeatures] = useState<string[]>([]);
+  const [foodFeatureInput, setFoodFeatureInput] = useState('');
+  const [hasDineIn, setHasDineIn] = useState(true);
+  const [hasTakeaway, setHasTakeaway] = useState(false);
+  const [hasDelivery, setHasDelivery] = useState(false);
+
+  // Itinerary
   const [itineraryDetails, setItineraryDetails] = useState<ItineraryDetailsValue>({
     days: [{ dayNumber: 1, title: 'Day 1', activities: [] }],
   });
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm<ProductFormData>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<ProductFormData>({
     resolver: zodResolver(productFormSchema),
   });
 
@@ -152,10 +240,10 @@ function ProductForm({ type }: { type: ProductType }) {
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true);
     try {
-      let coverImageUrl: string | undefined;
+      let thumbnailUrl: string | undefined;
       if (coverFile) {
         const res = await mediaApi.upload(coverFile);
-        coverImageUrl = res.data?.data?.url;
+        thumbnailUrl = res.data?.data?.url;
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -165,28 +253,59 @@ function ProductForm({ type }: { type: ProductType }) {
         description: data.description,
         price: data.price,
         isPublished: false,
-        ...(coverImageUrl ? { coverImageUrl } : {}),
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
         ...(tags.length > 0 ? { tags } : {}),
       };
 
       if (type === 'activity') {
-        if (data.duration) payload.duration = data.duration;
-        if (data.difficulty) payload.difficulty = data.difficulty;
-        if (data.groupSize) payload.groupSize = data.groupSize;
-        if (data.meetingPoint) payload.meetingPoint = data.meetingPoint;
+        payload.activityDetails = {
+          durationHours: data.duration,
+          maxGroupSize: data.groupSize,
+          difficultyLevel: data.difficulty,
+          meetingPoint: data.meetingPoint,
+          website: data.website,
+          phoneNumber: data.phoneNumber,
+          priceRange: data.priceRange,
+          address: activityLocation?.address,
+          latitude: activityLocation?.latitude,
+          longitude: activityLocation?.longitude,
+          osmId: activityLocation?.osmId,
+          openingHours: Object.keys(activityHours).length ? activityHours : undefined,
+        };
       } else if (type === 'stay') {
-        if (data.propertyType) payload.propertyType = data.propertyType;
-        if (data.starRating) payload.starRating = data.starRating;
-        if (data.address) payload.address = data.address;
-        if (amenities.length > 0) payload.amenities = amenities;
+        payload.stayDetails = {
+          propertyType: data.propertyType,
+          amenities: amenities.length ? amenities : undefined,
+          website: data.website,
+          phoneNumber: data.phoneNumber,
+          priceRange: data.priceRange,
+          address: stayLocation?.address,
+          latitude: stayLocation?.latitude,
+          longitude: stayLocation?.longitude,
+          osmId: stayLocation?.osmId,
+          openingHours: Object.keys(stayHours).length ? stayHours : undefined,
+        };
       } else if (type === 'itinerary') {
         payload.itineraryDetails = {
           ...itineraryDetails,
           totalDays: itineraryDetails.totalDays ?? itineraryDetails.days?.length,
-          days: (itineraryDetails.days ?? []).map((day, i) => ({
-            ...day,
-            dayNumber: i + 1,
-          })),
+          days: (itineraryDetails.days ?? []).map((day, i) => ({ ...day, dayNumber: i + 1 })),
+        };
+      } else if (type === 'food') {
+        payload.foodPlaceDetails = {
+          cuisine: data.cuisine,
+          priceRange: data.priceRange,
+          website: data.website,
+          phoneNumber: data.phoneNumber,
+          hasDineIn,
+          hasTakeaway,
+          hasDelivery,
+          features: foodFeatures.length ? foodFeatures : undefined,
+          address: foodLocation?.address,
+          latitude: foodLocation?.latitude,
+          longitude: foodLocation?.longitude,
+          osmId: foodLocation?.osmId,
+          openingHours: Object.keys(foodHours).length ? foodHours : undefined,
         };
       } else if (type === 'package') {
         if (data.duration) payload.duration = data.duration;
@@ -222,94 +341,48 @@ function ProductForm({ type }: { type: ProductType }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <Label>
-              Title <span className="text-red-500">*</span>
-            </Label>
+            <Label>Title <span className="text-red-500">*</span></Label>
             <Input placeholder="e.g. Sunrise Trek to Triund" {...register('title')} />
-            {errors.title && (
-              <p className="text-xs text-red-500">{errors.title.message}</p>
-            )}
+            {errors.title && <p className="text-xs text-red-500">{errors.title.message}</p>}
           </div>
 
           <div className="space-y-1.5">
-            <Label>
-              Description <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              rows={4}
-              placeholder="Describe what's included, what to expect..."
-              {...register('description')}
-            />
-            {errors.description && (
-              <p className="text-xs text-red-500">{errors.description.message}</p>
-            )}
+            <Label>Description <span className="text-red-500">*</span></Label>
+            <Textarea rows={4} placeholder="Describe what's included, what to expect..." {...register('description')} />
+            {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
           </div>
 
           <div className="space-y-1.5">
-            <Label>
-              Price (₹) <span className="text-red-500">*</span>
-            </Label>
+            <Label>Price (₹) <span className="text-red-500">*</span></Label>
             <Input type="number" min="1" placeholder="2500" {...register('price')} />
-            {errors.price && (
-              <p className="text-xs text-red-500">{errors.price.message}</p>
-            )}
+            {errors.price && <p className="text-xs text-red-500">{errors.price.message}</p>}
           </div>
 
           {/* Cover image */}
           <div className="space-y-1.5">
             <Label>Cover Image</Label>
             <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={(e) => {
-                e.preventDefault();
-                setIsDragging(false);
+                e.preventDefault(); setIsDragging(false);
                 const file = e.dataTransfer.files[0];
                 if (file?.type.startsWith('image/')) handleCoverChange(file);
               }}
-              className={`border-2 border-dashed rounded-lg overflow-hidden transition-colors ${
-                isDragging
-                  ? 'border-primary-400 bg-primary-50'
-                  : 'border-gray-200 hover:border-primary-300'
-              }`}
+              className={`border-2 border-dashed rounded-lg overflow-hidden transition-colors ${isDragging ? 'border-primary-400 bg-primary-50' : 'border-gray-200 hover:border-primary-300'}`}
             >
               {coverPreview ? (
                 <div className="relative">
-                  <img
-                    src={coverPreview}
-                    alt="Cover preview"
-                    className="w-full h-40 object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCoverFile(null);
-                      setCoverPreview(null);
-                    }}
-                    className="absolute top-2 right-2 w-7 h-7 bg-white/90 rounded-full flex items-center justify-center hover:bg-white"
-                  >
+                  <img src={coverPreview} alt="Cover preview" className="w-full h-40 object-cover" />
+                  <button type="button" onClick={() => { setCoverFile(null); setCoverPreview(null); }} className="absolute top-2 right-2 w-7 h-7 bg-white/90 rounded-full flex items-center justify-center hover:bg-white">
                     <X className="w-4 h-4 text-gray-700" />
                   </button>
                 </div>
               ) : (
                 <label className="cursor-pointer flex flex-col items-center gap-2 py-8">
                   <Upload className="w-6 h-6 text-gray-400" />
-                  <span className="text-sm text-gray-500">
-                    Drag & drop or{' '}
-                    <span className="text-primary-500 font-medium">click to upload</span>
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleCoverChange(file);
-                    }}
-                  />
+                  <span className="text-sm text-gray-500">Drag & drop or <span className="text-primary-500 font-medium">click to upload</span></span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleCoverChange(file); }} />
                 </label>
               )}
             </div>
@@ -318,89 +391,44 @@ function ProductForm({ type }: { type: ProductType }) {
           {/* Tags */}
           <div className="space-y-1.5">
             <Label>Tags</Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add tag..."
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const val = tagInput.trim();
-                    if (val && !tags.includes(val)) setTags([...tags, val]);
-                    setTagInput('');
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const val = tagInput.trim();
-                  if (val && !tags.includes(val)) setTags([...tags, val]);
-                  setTagInput('');
-                }}
-              >
-                Add
-              </Button>
-            </div>
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {tags.map((t) => (
-                  <span
-                    key={t}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-full text-xs text-gray-700"
-                  >
-                    {t}
-                    <button
-                      type="button"
-                      onClick={() => setTags(tags.filter((x) => x !== t))}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+            <TagChips
+              tags={tags} input={tagInput}
+              onInputChange={setTagInput}
+              onAdd={(v) => setTags([...tags, v])}
+              onRemove={(v) => setTags(tags.filter((t) => t !== v))}
+              placeholder="Add tag and press Enter..."
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Activity-specific */}
+      {/* ── Activity ─────────────────────────────────────────────────────────── */}
       {type === 'activity' && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Activity Details</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Activity Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+            <LocationSearch
+              label="Meeting Point / Location"
+              placeholder="Search for meeting point or activity venue…"
+              value={activityLocation}
+              onChange={setActivityLocation}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Duration (hours)</Label>
-                <Input
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  placeholder="4"
-                  {...register('duration')}
-                />
+                <Input type="number" min="0.5" step="0.5" placeholder="4" {...register('duration')} />
               </div>
               <div className="space-y-1.5">
-                <Label>Group Size</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  placeholder="10"
-                  {...register('groupSize')}
-                />
+                <Label>Max Group Size</Label>
+                <Input type="number" min="1" placeholder="10" {...register('groupSize')} />
               </div>
             </div>
+
             <div className="space-y-1.5">
               <Label>Difficulty</Label>
               <Select onValueChange={(v) => setValue('difficulty', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select difficulty" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select difficulty" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="easy">Easy</SelectItem>
                   <SelectItem value="moderate">Moderate</SelectItem>
@@ -409,31 +437,58 @@ function ProductForm({ type }: { type: ProductType }) {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-1.5">
-              <Label>Meeting Point</Label>
-              <Input
-                placeholder="e.g. Dharamshala Bus Stand"
-                {...register('meetingPoint')}
-              />
+              <Label>Physical Meeting Point</Label>
+              <Input placeholder="e.g. Dharamshala Bus Stand, Gate 3" {...register('meetingPoint')} />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Website</Label>
+                <Input placeholder="https://..." {...register('website')} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input placeholder="+91 98765 43210" {...register('phoneNumber')} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Price Range</Label>
+              <Select onValueChange={(v) => setValue('priceRange', v)}>
+                <SelectTrigger><SelectValue placeholder="Select price range" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="$">$ · Budget</SelectItem>
+                  <SelectItem value="$$">$$ · Mid-range</SelectItem>
+                  <SelectItem value="$$$">$$$ · Premium</SelectItem>
+                  <SelectItem value="$$$$">$$$$ · Luxury</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <OpeningHoursEditor value={activityHours} onChange={setActivityHours} />
           </CardContent>
         </Card>
       )}
 
-      {/* Stay-specific */}
+      {/* ── Stay ─────────────────────────────────────────────────────────────── */}
       {type === 'stay' && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Stay Details</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Stay Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+            <LocationSearch
+              label="Property Address"
+              placeholder="Search for hotel, villa, or property…"
+              value={stayLocation}
+              onChange={setStayLocation}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Property Type</Label>
                 <Select onValueChange={(v) => setValue('propertyType', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="hotel">Hotel</SelectItem>
                     <SelectItem value="villa">Villa</SelectItem>
@@ -446,162 +501,177 @@ function ProductForm({ type }: { type: ProductType }) {
               </div>
               <div className="space-y-1.5">
                 <Label>Star Rating</Label>
-                <Select
-                  onValueChange={(v) => setValue('starRating', Number(v))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Stars" />
-                  </SelectTrigger>
+                <Select onValueChange={(v) => setValue('starRating', Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Stars" /></SelectTrigger>
                   <SelectContent>
                     {[1, 2, 3, 4, 5].map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {'⭐'.repeat(n)} ({n} star{n > 1 ? 's' : ''})
-                      </SelectItem>
+                      <SelectItem key={n} value={String(n)}>{'⭐'.repeat(n)} ({n} star{n > 1 ? 's' : ''})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Address</Label>
-              <Input placeholder="Full property address" {...register('address')} />
-            </div>
+
             <div className="space-y-1.5">
               <Label>Amenities</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="e.g. Swimming Pool"
-                  value={amenityInput}
-                  onChange={(e) => setAmenityInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const val = amenityInput.trim();
-                      if (val && !amenities.includes(val))
-                        setAmenities([...amenities, val]);
-                      setAmenityInput('');
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const val = amenityInput.trim();
-                    if (val && !amenities.includes(val))
-                      setAmenities([...amenities, val]);
-                    setAmenityInput('');
-                  }}
-                >
-                  Add
-                </Button>
-              </div>
-              {amenities.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {amenities.map((a) => (
-                    <Badge
-                      key={a}
-                      variant="secondary"
-                      className="cursor-pointer"
-                      onClick={() =>
-                        setAmenities(amenities.filter((x) => x !== a))
-                      }
-                    >
-                      {a} <X className="w-3 h-3 ml-1" />
-                    </Badge>
-                  ))}
-                </div>
-              )}
+              <TagChips
+                tags={amenities} input={amenityInput}
+                onInputChange={setAmenityInput}
+                onAdd={(v) => setAmenities([...amenities, v])}
+                onRemove={(v) => setAmenities(amenities.filter((a) => a !== v))}
+                placeholder="e.g. Swimming Pool"
+              />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Website</Label>
+                <Input placeholder="https://..." {...register('website')} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input placeholder="+91 98765 43210" {...register('phoneNumber')} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Price Range</Label>
+              <Select onValueChange={(v) => setValue('priceRange', v)}>
+                <SelectTrigger><SelectValue placeholder="Select price range" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="$">$ · Budget</SelectItem>
+                  <SelectItem value="$$">$$ · Mid-range</SelectItem>
+                  <SelectItem value="$$$">$$$ · Premium</SelectItem>
+                  <SelectItem value="$$$$">$$$$ · Luxury</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <OpeningHoursEditor value={stayHours} onChange={setStayHours} />
           </CardContent>
         </Card>
       )}
 
-      {/* Itinerary-specific */}
+      {/* ── Itinerary ─────────────────────────────────────────────────────────── */}
       {type === 'itinerary' && (
-        <ItineraryBuilder
-          value={itineraryDetails}
-          onChange={setItineraryDetails}
-        />
+        <ItineraryBuilder value={itineraryDetails} onChange={setItineraryDetails} />
       )}
 
-      {/* Package-specific */}
+      {/* ── Food Place ────────────────────────────────────────────────────────── */}
+      {type === 'food' && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Food Place Details</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <LocationSearch
+              label="Restaurant / Café Location"
+              placeholder="Search for restaurant or food place…"
+              value={foodLocation}
+              onChange={setFoodLocation}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Cuisine Type</Label>
+                <Input placeholder="e.g. Indian, Italian, Thai" {...register('cuisine')} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Price Range</Label>
+                <Select onValueChange={(v) => setValue('priceRange', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select price range" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="$">$ · Under ₹300</SelectItem>
+                    <SelectItem value="$$">$$ · ₹300–700</SelectItem>
+                    <SelectItem value="$$$">$$$ · ₹700–1500</SelectItem>
+                    <SelectItem value="$$$$">$$$$ · ₹1500+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Website</Label>
+                <Input placeholder="https://..." {...register('website')} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input placeholder="+91 98765 43210" {...register('phoneNumber')} />
+              </div>
+            </div>
+
+            {/* Service options */}
+            <div className="space-y-1.5">
+              <Label>Service Options</Label>
+              <div className="flex flex-wrap gap-2">
+                <Toggle value={hasDineIn} onChange={setHasDineIn} label="Dine-in" />
+                <Toggle value={hasTakeaway} onChange={setHasTakeaway} label="Takeaway" />
+                <Toggle value={hasDelivery} onChange={setHasDelivery} label="Delivery" />
+              </div>
+            </div>
+
+            {/* Features */}
+            <div className="space-y-1.5">
+              <Label>Features</Label>
+              <TagChips
+                tags={foodFeatures} input={foodFeatureInput}
+                onInputChange={setFoodFeatureInput}
+                onAdd={(v) => setFoodFeatures([...foodFeatures, v])}
+                onRemove={(v) => setFoodFeatures(foodFeatures.filter((f) => f !== v))}
+                placeholder="e.g. Rooftop, Live Music, Vegan Options"
+              />
+            </div>
+
+            <OpeningHoursEditor value={foodHours} onChange={setFoodHours} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Package ───────────────────────────────────────────────────────────── */}
       {type === 'package' && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Package Details</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Package Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Duration (days)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  placeholder="7"
-                  {...register('duration')}
-                />
+                <Input type="number" min="1" placeholder="7" {...register('duration')} />
               </div>
               <div className="space-y-1.5">
                 <Label>Max Group Size</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  placeholder="15"
-                  {...register('groupSize')}
-                />
+                <Input type="number" min="1" placeholder="15" {...register('groupSize')} />
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Visa-specific */}
+      {/* ── Visa ─────────────────────────────────────────────────────────────── */}
       {type === 'visa' && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Visa Service Details</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Visa Service Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>
-                  From Country <span className="text-red-500">*</span>
-                </Label>
+                <Label>From Country <span className="text-red-500">*</span></Label>
                 <Input placeholder="e.g. India" {...register('fromCountry')} />
               </div>
               <div className="space-y-1.5">
-                <Label>
-                  To Country <span className="text-red-500">*</span>
-                </Label>
+                <Label>To Country <span className="text-red-500">*</span></Label>
                 <Input placeholder="e.g. Thailand" {...register('toCountry')} />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label>Visa Type</Label>
-              <Input
-                placeholder="e.g. Tourist Visa, Business Visa"
-                {...register('visaType')}
-              />
+              <Input placeholder="e.g. Tourist Visa, Business Visa" {...register('visaType')} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Processing Time</Label>
-                <Input
-                  placeholder="e.g. 3-5 business days"
-                  {...register('processingTime')}
-                />
+                <Input placeholder="e.g. 3–5 business days" {...register('processingTime')} />
               </div>
               <div className="space-y-1.5">
                 <Label>Success Rate (%)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  placeholder="95"
-                  {...register('successRate')}
-                />
+                <Input type="number" min="0" max="100" placeholder="95" {...register('successRate')} />
               </div>
             </div>
           </CardContent>
@@ -613,17 +683,13 @@ function ProductForm({ type }: { type: ProductType }) {
           {isSubmitting ? (
             <span className="flex items-center gap-2">
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Creating...
+              Creating…
             </span>
           ) : (
             'Create Product (Draft)'
           )}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate({ to: '/products' })}
-        >
+        <Button type="button" variant="outline" onClick={() => navigate({ to: '/products' })}>
           Cancel
         </Button>
       </div>
@@ -639,28 +705,19 @@ export default function NewProductPage() {
   return (
     <AppLayout>
       <div className="p-6 max-w-3xl mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() =>
-              selectedType
-                ? setSelectedType(null)
-                : navigate({ to: '/products' })
-            }
+            onClick={() => selectedType ? setSelectedType(null) : navigate({ to: '/products' })}
             className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50"
           >
             <ArrowLeft className="w-4 h-4 text-gray-600" />
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {selectedType
-                ? `New ${PRODUCT_TYPES.find((t) => t.id === selectedType)?.label}`
-                : 'Choose Product Type'}
+              {selectedType ? `New ${PRODUCT_TYPES.find((t) => t.id === selectedType)?.label}` : 'Choose Product Type'}
             </h1>
             {!selectedType && (
-              <p className="text-gray-500 text-sm mt-0.5">
-                What kind of product do you want to create?
-              </p>
+              <p className="text-gray-500 text-sm mt-0.5">What kind of product do you want to create?</p>
             )}
           </div>
         </div>
