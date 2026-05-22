@@ -9,6 +9,8 @@ import {
   LogOut,
   ChevronDown,
   ArrowLeft,
+  Users,
+  UserCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { authApi } from '@/api/auth.api';
@@ -24,9 +26,11 @@ import {
 
 const adminNavLinks = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/admin/users', label: 'Users', icon: Users, exact: false },
+  { to: '/admin/creators', label: 'Creators', icon: UserCheck, exact: false },
+  { to: '/admin/invites', label: 'Creator Invites', icon: Mail, exact: false },
   { to: '/admin/destinations', label: 'Destinations', icon: MapPin, exact: false },
   { to: '/admin/plans', label: 'Subscription Plans', icon: CreditCard, exact: false },
-  { to: '/admin/invites', label: 'Creator Invites', icon: Mail, exact: false },
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import * as path from 'path';
+import * as bcrypt from 'bcrypt';
 // Load tsconfig paths so @common/* etc. resolve
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require('tsconfig-paths').register({
@@ -128,6 +129,31 @@ async function seedSubscriptionPlans() {
   return count;
 }
 
+// ── Seed admin user ───────────────────────────────────────────────────────────
+async function seedAdminUser() {
+  const repo = AppDataSource.getRepository('users');
+  const email = 'admin@travelhues.com';
+  const exists = await repo.findOne({ where: { email } });
+  if (exists) {
+    console.log(`  skip (exists): ${email}`);
+    return false;
+  }
+
+  const passwordHash = await bcrypt.hash('Admin@123', 10);
+  await repo.save(
+    repo.create({
+      email,
+      passwordHash,
+      firstName: 'TravelHues',
+      lastName: 'Admin',
+      role: 'admin',
+      isEmailVerified: true,
+    }),
+  );
+  console.log(`  ✓ ${email}  (password: Admin@123)`);
+  return true;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('\n🌱  TravelHues seed starting...\n');
@@ -135,6 +161,10 @@ async function main() {
   try {
     await AppDataSource.initialize();
     console.log('✅  Database connected\n');
+
+    console.log('👤  Seeding Admin User...');
+    await seedAdminUser();
+    console.log('');
 
     console.log('📍  Seeding Destinations...');
     const { countryCount, cityCount } = await seedDestinations();

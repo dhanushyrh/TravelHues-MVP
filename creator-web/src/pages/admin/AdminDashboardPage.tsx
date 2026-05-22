@@ -1,10 +1,20 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, CreditCard, Mail, Globe } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import { MapPin, CreditCard, Mail, Users, UserCheck, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { adminDestinationsApi, adminPlansApi, adminInvitesApi } from '@/api/admin.api';
+import { adminStatsApi, adminInvitesApi } from '@/api/admin.api';
+
+interface PlatformStats {
+  totalUsers: number;
+  totalCreators: number;
+  totalDestinations: number;
+  totalPlans: number;
+  pendingInvites: number;
+}
 
 interface InviteStats {
   total: number;
@@ -15,22 +25,13 @@ interface InviteStats {
 }
 
 function StatCard({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  color,
-  isLoading,
+  label, value, sub, icon: Icon, color, isLoading, onClick,
 }: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: React.ElementType;
-  color: string;
-  isLoading?: boolean;
+  label: string; value: string | number; sub?: string;
+  icon: React.ElementType; color: string; isLoading?: boolean; onClick?: () => void;
 }) {
   return (
-    <Card>
+    <Card className={onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''} onClick={onClick}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -40,9 +41,7 @@ function StatCard({
             ) : (
               <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
             )}
-            {sub && !isLoading && (
-              <p className="text-xs text-gray-400 mt-1">{sub}</p>
-            )}
+            {sub && !isLoading && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
           </div>
           <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
             <Icon className="w-6 h-6" />
@@ -54,25 +53,12 @@ function StatCard({
 }
 
 export default function AdminDashboardPage() {
-  const { data: destinationsData, isLoading: isLoadingDest } = useQuery({
-    queryKey: ['admin', 'destinations', 'count'],
-    queryFn: () => adminDestinationsApi.list({ limit: 1 }),
-    select: (res) => res.data?.data ?? res.data,
-  });
+  const navigate = useNavigate();
 
-  const { data: activeDest, isLoading: isLoadingActiveDest } = useQuery({
-    queryKey: ['admin', 'destinations', 'active-count'],
-    queryFn: () => adminDestinationsApi.list({ limit: 1 }),
-    select: (res) => {
-      const d = res.data?.data ?? res.data;
-      return d?.meta?.total ?? 0;
-    },
-  });
-
-  const { data: plansData, isLoading: isLoadingPlans } = useQuery({
-    queryKey: ['admin', 'plans'],
-    queryFn: () => adminPlansApi.list(),
-    select: (res) => res.data?.data ?? res.data,
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['admin', 'stats'],
+    queryFn: () => adminStatsApi.get(),
+    select: (res) => (res.data?.data ?? res.data) as PlatformStats,
   });
 
   const { data: inviteStats, isLoading: isLoadingInvites } = useQuery({
@@ -81,69 +67,105 @@ export default function AdminDashboardPage() {
     select: (res) => (res.data?.data ?? res.data) as InviteStats,
   });
 
-  const totalDestinations = destinationsData?.meta?.total ?? destinationsData?.total ?? 0;
-  const totalPlans = Array.isArray(plansData) ? plansData.length : (plansData?.data?.length ?? 0);
-  const activePlans = Array.isArray(plansData)
-    ? plansData.filter((p: { isActive?: boolean }) => p.isActive).length
-    : 0;
-
   return (
     <AdminLayout>
       <div className="p-6 max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Overview of your platform.</p>
+          <p className="text-gray-500 text-sm mt-0.5">Platform overview</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           <StatCard
-            label="Total Destinations"
-            value={totalDestinations}
-            icon={Globe}
+            label="Total Users"
+            value={stats?.totalUsers ?? 0}
+            icon={Users}
             color="bg-blue-50 text-blue-600"
-            isLoading={isLoadingDest}
+            isLoading={isLoading}
+            onClick={() => navigate({ to: '/admin/users' })}
           />
           <StatCard
-            label="Active Destinations"
-            value={activeDest ?? 0}
+            label="Creators"
+            value={stats?.totalCreators ?? 0}
+            icon={UserCheck}
+            color="bg-purple-50 text-purple-600"
+            isLoading={isLoading}
+            onClick={() => navigate({ to: '/admin/creators' })}
+          />
+          <StatCard
+            label="Destinations"
+            value={stats?.totalDestinations ?? 0}
+            sub="Active only"
             icon={MapPin}
             color="bg-green-50 text-green-600"
-            isLoading={isLoadingActiveDest}
+            isLoading={isLoading}
+            onClick={() => navigate({ to: '/admin/destinations' })}
           />
           <StatCard
-            label="Subscription Plans"
-            value={totalPlans}
-            sub={activePlans ? `${activePlans} active` : undefined}
+            label="Active Plans"
+            value={stats?.totalPlans ?? 0}
             icon={CreditCard}
-            color="bg-purple-50 text-purple-600"
-            isLoading={isLoadingPlans}
+            color="bg-amber-50 text-amber-600"
+            isLoading={isLoading}
+            onClick={() => navigate({ to: '/admin/plans' })}
           />
           <StatCard
-            label="Creator Invites"
-            value={inviteStats?.total ?? 0}
-            sub={inviteStats ? `${inviteStats.pending} pending · ${inviteStats.used} used` : undefined}
+            label="Pending Invites"
+            value={stats?.pendingInvites ?? 0}
             icon={Mail}
             color="bg-orange-50 text-orange-600"
-            isLoading={isLoadingInvites}
+            isLoading={isLoading}
+            onClick={() => navigate({ to: '/admin/invites' })}
           />
         </div>
 
         {/* Invite breakdown */}
         {!isLoadingInvites && inviteStats && (
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: 'Pending', count: inviteStats.pending, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-              { label: 'Used', count: inviteStats.used, color: 'bg-green-50 text-green-700 border-green-200' },
-              { label: 'Revoked', count: inviteStats.revoked, color: 'bg-red-50 text-red-700 border-red-200' },
-              { label: 'Expired', count: inviteStats.expired, color: 'bg-gray-50 text-gray-600 border-gray-200' },
-            ].map(({ label, count, color }) => (
-              <div key={label} className={`rounded-lg border px-4 py-3 ${color}`}>
-                <p className="text-xs font-medium">{label}</p>
-                <p className="text-2xl font-bold mt-0.5">{count}</p>
+          <Card className="mb-6">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-gray-700">Invite Breakdown</p>
+                <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/admin/invites' })}>
+                  Manage <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Pending', count: inviteStats.pending, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+                  { label: 'Used', count: inviteStats.used, color: 'bg-green-50 text-green-700 border-green-200' },
+                  { label: 'Revoked', count: inviteStats.revoked, color: 'bg-red-50 text-red-700 border-red-200' },
+                  { label: 'Expired', count: inviteStats.expired, color: 'bg-gray-50 text-gray-600 border-gray-200' },
+                ].map(({ label, count, color }) => (
+                  <div key={label} className={`rounded-lg border px-4 py-3 ${color}`}>
+                    <p className="text-xs font-medium">{label}</p>
+                    <p className="text-2xl font-bold mt-0.5">{count}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
+
+        {/* Quick actions */}
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</p>
+            <div className="flex flex-wrap gap-3">
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: '/admin/users' })}>
+                <Users className="w-4 h-4 mr-2" /> Manage Users
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: '/admin/creators' })}>
+                <UserCheck className="w-4 h-4 mr-2" /> Manage Creators
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: '/admin/invites' })}>
+                <Mail className="w-4 h-4 mr-2" /> Send Invite
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: '/admin/destinations' })}>
+                <MapPin className="w-4 h-4 mr-2" /> Destinations
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </AdminLayout>
   );

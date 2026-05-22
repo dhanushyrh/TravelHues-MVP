@@ -75,3 +75,32 @@ export const adminInvitesApi = {
 
   revoke: (id: string) => api.delete(`/admin/invites/${id}`),
 };
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+export const adminUsersApi = {
+  list: (params?: { search?: string; role?: string; page?: number; limit?: number }) =>
+    api.get('/admin/users', { params }),
+
+  get: (id: string) => api.get(`/admin/users/${id}`),
+
+  updateRole: (id: string, role: string) => api.patch(`/admin/users/${id}/role`, { role }),
+
+  delete: (id: string) => api.delete(`/admin/users/${id}`),
+};
+
+// ── Creators ──────────────────────────────────────────────────────────────────
+export const adminCreatorsApi = {
+  list: (params?: { search?: string; tier?: string; page?: number; limit?: number }) =>
+    api.get('/admin/creators', { params }),
+
+  toggleVerified: (id: string) => api.patch(`/admin/creators/${id}/toggle-verified`),
+
+  updateTier: (id: string, tier: string) => api.patch(`/admin/creators/${id}/tier`, { tier }),
+
+  delete: (id: string) => api.delete(`/admin/creators/${id}`),
+};
+
+// ── Platform stats ────────────────────────────────────────────────────────────
+export const adminStatsApi = {
+  get: () => api.get('/admin/stats'),
+};

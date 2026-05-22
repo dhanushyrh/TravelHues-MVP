@@ -7,12 +7,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import * as bcrypt from 'bcrypt';
 import slugify from 'slugify';
 import { CreatorInvite } from '../../database/entities/creator-invite.entity';
 import { User } from '../../database/entities/user.entity';
+import { CreatorProfile } from '../../database/entities/creator-profile.entity';
 import { Destination } from '../../database/entities/destination.entity';
 import { SubscriptionPlan } from '../../database/entities/subscription-plan.entity';
-import { InviteStatus, DestinationType } from '../../common/enums';
+import { InviteStatus, DestinationType, UserRole, CreatorTier } from '../../common/enums';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { CreateDestinationDto } from '../destinations/dto/create-destination.dto';
@@ -27,6 +29,8 @@ export class AdminService {
     private readonly inviteRepository: Repository<CreatorInvite>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(CreatorProfile)
+    private readonly creatorRepository: Repository<CreatorProfile>,
     @InjectRepository(Destination)
     private readonly destinationRepository: Repository<Destination>,
     @InjectRepository(SubscriptionPlan)
@@ -280,6 +284,115 @@ export class AdminService {
     if (!plan) throw new NotFoundException('Subscription plan not found');
 
     await this.planRepository.remove(plan);
+    return { success: true };
+  }
+
+  // ── Platform stats ─────────────────────────────────────────────────────────
+
+  async getPlatformStats() {
+    const [totalUsers, totalCreators, totalDestinations, totalPlans, pendingInvites] =
+      await Promise.all([
+        this.userRepository.count(),
+        this.creatorRepository.count(),
+        this.destinationRepository.count({ where: { isActive: true } }),
+        this.planRepository.count({ where: { isActive: true } }),
+        this.inviteRepository.count({ where: { status: InviteStatus.PENDING } }),
+      ]);
+    return { totalUsers, totalCreators, totalDestinations, totalPlans, pendingInvites };
+  }
+
+  // ── User management ────────────────────────────────────────────────────────
+
+  async listUsers(filters: { search?: string; role?: UserRole; page?: number; limit?: number }) {
+    const { search, role, page = 1, limit = 20 } = filters;
+
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .orderBy('user.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (role) qb.andWhere('user.role = :role', { role });
+    if (search) {
+      qb.andWhere(
+        '(user.firstName ILIKE :s OR user.lastName ILIKE :s OR user.email ILIKE :s)',
+        { s: `%${search}%` },
+      );
+    }
+
+    const [data, total] = await qb.getManyAndCount();
+    const safeData = data.map(({ passwordHash, emailVerificationToken, passwordResetToken, passwordResetExpiry, ...u }) => u);
+    return { data: safeData, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getUserDetail(id: string) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    const { passwordHash, emailVerificationToken, passwordResetToken, passwordResetExpiry, ...safe } = user as any;
+    const creator = await this.creatorRepository.findOne({ where: { userId: id } });
+    return { ...safe, creatorProfile: creator ?? null };
+  }
+
+  async updateUserRole(id: string, role: UserRole, adminId: string) {
+    if (id === adminId) throw new ForbiddenException('You cannot change your own role');
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    user.role = role;
+    await this.userRepository.save(user);
+    const { passwordHash, ...safe } = user as any;
+    return safe;
+  }
+
+  async deleteUser(id: string, adminId: string) {
+    if (id === adminId) throw new ForbiddenException('You cannot delete yourself');
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    await this.userRepository.remove(user);
+    return { success: true };
+  }
+
+  // ── Creator management ─────────────────────────────────────────────────────
+
+  async listCreators(filters: { search?: string; tier?: CreatorTier; page?: number; limit?: number }) {
+    const { search, tier, page = 1, limit = 20 } = filters;
+
+    const qb = this.creatorRepository
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.user', 'user')
+      .orderBy('c.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (tier) qb.andWhere('c.creatorTier = :tier', { tier });
+    if (search) {
+      qb.andWhere(
+        '(c.displayName ILIKE :s OR user.email ILIKE :s OR user.firstName ILIKE :s)',
+        { s: `%${search}%` },
+      );
+    }
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async toggleCreatorVerified(id: string): Promise<CreatorProfile> {
+    const creator = await this.creatorRepository.findOne({ where: { id } });
+    if (!creator) throw new NotFoundException('Creator not found');
+    creator.isVerified = !creator.isVerified;
+    return this.creatorRepository.save(creator);
+  }
+
+  async updateCreatorTier(id: string, tier: CreatorTier): Promise<CreatorProfile> {
+    const creator = await this.creatorRepository.findOne({ where: { id } });
+    if (!creator) throw new NotFoundException('Creator not found');
+    creator.creatorTier = tier;
+    return this.creatorRepository.save(creator);
+  }
+
+  async deleteCreator(id: string): Promise<{ success: boolean }> {
+    const creator = await this.creatorRepository.findOne({ where: { id } });
+    if (!creator) throw new NotFoundException('Creator not found');
+    await this.creatorRepository.remove(creator);
     return { success: true };
   }
 }

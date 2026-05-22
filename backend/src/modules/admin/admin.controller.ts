@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, HttpCode,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
@@ -11,7 +11,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { ParseUuidPipe } from '../../common/pipes/parse-uuid.pipe';
-import { UserRole, InviteStatus, DestinationType } from '../../common/enums';
+import { UserRole, InviteStatus, DestinationType, CreatorTier } from '../../common/enums';
 import { User } from '../../database/entities/user.entity';
 import { CreateDestinationDto } from '../destinations/dto/create-destination.dto';
 
@@ -22,6 +22,87 @@ import { CreateDestinationDto } from '../destinations/dto/create-destination.dto
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  // ── Platform stats ─────────────────────────────────────────────────────────
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Get platform-wide stats (admin only)' })
+  getPlatformStats() {
+    return this.adminService.getPlatformStats();
+  }
+
+  // ── User management ────────────────────────────────────────────────────────
+
+  @Get('users')
+  @ApiOperation({ summary: 'List all users with optional search/role filter (admin only)' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'role', enum: UserRole, required: false })
+  listUsers(
+    @Query() pagination: PaginationDto,
+    @Query('search') search?: string,
+    @Query('role') role?: UserRole,
+  ) {
+    return this.adminService.listUsers({ search, role, page: pagination.page, limit: pagination.limit });
+  }
+
+  @Get('users/:id')
+  @ApiOperation({ summary: 'Get user detail with creator profile (admin only)' })
+  getUserDetail(@Param('id', ParseUuidPipe) id: string) {
+    return this.adminService.getUserDetail(id);
+  }
+
+  @Patch('users/:id/role')
+  @ApiOperation({ summary: 'Change a user\'s role (admin only)' })
+  updateUserRole(
+    @Param('id', ParseUuidPipe) id: string,
+    @Body('role') role: UserRole,
+    @CurrentUser() user: User,
+  ) {
+    return this.adminService.updateUserRole(id, role, user.id);
+  }
+
+  @Delete('users/:id')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete a user account (admin only)' })
+  deleteUser(@Param('id', ParseUuidPipe) id: string, @CurrentUser() user: User) {
+    return this.adminService.deleteUser(id, user.id);
+  }
+
+  // ── Creator management ─────────────────────────────────────────────────────
+
+  @Get('creators')
+  @ApiOperation({ summary: 'List all creator profiles (admin only)' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'tier', enum: CreatorTier, required: false })
+  listCreators(
+    @Query() pagination: PaginationDto,
+    @Query('search') search?: string,
+    @Query('tier') tier?: CreatorTier,
+  ) {
+    return this.adminService.listCreators({ search, tier, page: pagination.page, limit: pagination.limit });
+  }
+
+  @Patch('creators/:id/toggle-verified')
+  @ApiOperation({ summary: 'Toggle creator verified badge (admin only)' })
+  toggleCreatorVerified(@Param('id', ParseUuidPipe) id: string) {
+    return this.adminService.toggleCreatorVerified(id);
+  }
+
+  @Patch('creators/:id/tier')
+  @ApiOperation({ summary: 'Update creator tier (admin only)' })
+  updateCreatorTier(
+    @Param('id', ParseUuidPipe) id: string,
+    @Body('tier') tier: CreatorTier,
+  ) {
+    return this.adminService.updateCreatorTier(id, tier);
+  }
+
+  @Delete('creators/:id')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete creator profile (admin only)' })
+  deleteCreator(@Param('id', ParseUuidPipe) id: string) {
+    return this.adminService.deleteCreator(id);
+  }
 
   // ── Invite management ──────────────────────────────────────────────────────
 

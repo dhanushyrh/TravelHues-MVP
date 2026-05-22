@@ -21,6 +21,8 @@ import AdminDashboardPage from '@/pages/admin/AdminDashboardPage';
 import AdminDestinationsPage from '@/pages/admin/AdminDestinationsPage';
 import AdminPlansPage from '@/pages/admin/AdminPlansPage';
 import AdminInvitesPage from '@/pages/admin/AdminInvitesPage';
+import AdminUsersPage from '@/pages/admin/AdminUsersPage';
+import AdminCreatorsPage from '@/pages/admin/AdminCreatorsPage';
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function requireAuth() {
@@ -159,6 +161,20 @@ const adminInvitesRoute = createRoute({
   beforeLoad: requireAdmin,
 });
 
+const adminUsersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/users',
+  component: AdminUsersPage,
+  beforeLoad: requireAdmin,
+});
+
+const adminCreatorsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/creators',
+  component: AdminCreatorsPage,
+  beforeLoad: requireAdmin,
+});
+
 // ── Router ────────────────────────────────────────────────────────────────────
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -176,6 +192,8 @@ const routeTree = rootRoute.addChildren([
   adminDestinationsRoute,
   adminPlansRoute,
   adminInvitesRoute,
+  adminUsersRoute,
+  adminCreatorsRoute,
 ]);
 
 export const router = createRouter({
