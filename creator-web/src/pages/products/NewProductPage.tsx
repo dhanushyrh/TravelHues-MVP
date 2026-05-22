@@ -106,6 +106,10 @@ const productFormSchema = z.object({
   website: z.string().optional(),
   phoneNumber: z.string().optional(),
   priceRange: z.string().optional(),
+  subCategory: z.string().optional(),
+  ageGroup: z.string().optional(),
+  affiliateLink: z.string().optional(),
+  estimatedCost: z.string().optional(),
   // Stay
   propertyType: z.string().optional(),
   starRating: z.coerce.number().optional(),
@@ -199,6 +203,7 @@ function ProductForm({ type }: { type: ProductType }) {
   // Activity / Stay / Food — shared location & hours
   const [activityLocation, setActivityLocation] = useState<LocationValue | null>(null);
   const [activityHours, setActivityHours] = useState<Record<string, string>>({});
+  const [seasonality, setSeasonality] = useState<string[]>([]);
   const [amenities, setAmenities] = useState<string[]>([]);
   const [amenityInput, setAmenityInput] = useState('');
   const [stayLocation, setStayLocation] = useState<LocationValue | null>(null);
@@ -266,6 +271,11 @@ function ProductForm({ type }: { type: ProductType }) {
           website: data.website,
           phoneNumber: data.phoneNumber,
           priceRange: data.priceRange,
+          subCategory: data.subCategory,
+          ageGroup: data.ageGroup,
+          affiliateLink: data.affiliateLink,
+          estimatedCost: data.estimatedCost,
+          seasonality: seasonality.length ? seasonality : undefined,
           address: activityLocation?.address,
           latitude: activityLocation?.latitude,
           longitude: activityLocation?.longitude,
@@ -425,17 +435,80 @@ function ProductForm({ type }: { type: ProductType }) {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Sub Category</Label>
+                <Select onValueChange={(v) => setValue('subCategory', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="trekking">Trekking</SelectItem>
+                    <SelectItem value="water_sports">Water Sports</SelectItem>
+                    <SelectItem value="cultural">Cultural</SelectItem>
+                    <SelectItem value="adventure">Adventure</SelectItem>
+                    <SelectItem value="wildlife">Wildlife</SelectItem>
+                    <SelectItem value="city_tour">City Tour</SelectItem>
+                    <SelectItem value="food_tour">Food Tour</SelectItem>
+                    <SelectItem value="photography">Photography</SelectItem>
+                    <SelectItem value="wellness">Wellness & Spa</SelectItem>
+                    <SelectItem value="workshop">Workshop</SelectItem>
+                    <SelectItem value="sports">Sports</SelectItem>
+                    <SelectItem value="nightlife">Nightlife</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Difficulty</Label>
+                <Select onValueChange={(v) => setValue('difficulty', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select difficulty" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="easy">Easy</SelectItem>
+                    <SelectItem value="moderate">Moderate</SelectItem>
+                    <SelectItem value="challenging">Challenging</SelectItem>
+                    <SelectItem value="extreme">Extreme</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Age Group</Label>
+                <Select onValueChange={(v) => setValue('ageGroup', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select age group" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all_ages">All Ages</SelectItem>
+                    <SelectItem value="kids_friendly">Kids Friendly (5+)</SelectItem>
+                    <SelectItem value="teens_up">Teens &amp; Up (13+)</SelectItem>
+                    <SelectItem value="adults_only">Adults Only (18+)</SelectItem>
+                    <SelectItem value="seniors_ok">Seniors OK</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Estimated Cost</Label>
+                <Input placeholder="e.g. ₹1,500–₹3,000 per person" {...register('estimatedCost')} />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <Label>Difficulty</Label>
-              <Select onValueChange={(v) => setValue('difficulty', v)}>
-                <SelectTrigger><SelectValue placeholder="Select difficulty" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="easy">Easy</SelectItem>
-                  <SelectItem value="moderate">Moderate</SelectItem>
-                  <SelectItem value="challenging">Challenging</SelectItem>
-                  <SelectItem value="extreme">Extreme</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Best Seasons</Label>
+              <div className="flex flex-wrap gap-2">
+                {['Jan–Mar', 'Apr–Jun', 'Jul–Sep', 'Oct–Dec', 'All Year'].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSeasonality((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s])}
+                    className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+                      seasonality.includes(s)
+                        ? 'bg-primary-500 border-primary-500 text-white'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-primary-300'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -445,13 +518,18 @@ function ProductForm({ type }: { type: ProductType }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Website</Label>
+                <Label>Reference Website</Label>
                 <Input placeholder="https://..." {...register('website')} />
               </div>
               <div className="space-y-1.5">
                 <Label>Phone</Label>
                 <Input placeholder="+91 98765 43210" {...register('phoneNumber')} />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Affiliate / Booking Link</Label>
+              <Input placeholder="https://affiliate.example.com/activity?ref=..." {...register('affiliateLink')} />
             </div>
 
             <div className="space-y-1.5">
